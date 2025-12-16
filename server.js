@@ -2,6 +2,7 @@ require('dotenv').config();
 const express = require('express');
 const session = require('express-session');
 const MongoStore = require('connect-mongo');
+const flash = require('connect-flash');
 const passport = require('./config/passport');
 const connectDB = require('./config/database');
 const errorHandler = require('./middleware/errorHandler');
@@ -43,11 +44,14 @@ app.use(session({
 app.use(passport.initialize());
 app.use(passport.session());
 
+// Flash messages
+app.use(flash());
+
 // Make user available to all views
 app.use((req, res, next) => {
   res.locals.user = req.user || null;
-  res.locals.error = req.query.error || null;
-  res.locals.success = req.query.success || null;
+  res.locals.error = req.query.error || req.flash('error')[0] || null;
+  res.locals.success = req.query.success || req.flash('success')[0] || null;
   next();
 });
 
