@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title><%= typeof title !== 'undefined' ? title + ' - ' : '' %>Felton Brushes Attendance</title>
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <% if (user) { %>
+    <%- include('../partials/header') %>
+    <%- include('../partials/sidebar') %>
+  <% } %>
+
+  <main class="<%= user ? 'main-with-sidebar' : 'main-full' %>">
+    <% if (error) { %>
+      <div class="alert alert-error">
+        <%= error %>
+      </div>
+    <% } %>
+
+    <% if (success) { %>
+      <div class="alert alert-success">
+        <%= success %>
+      </div>
+    <% } %>
+
+    <%- body %>
+  </main>
+
+  <script src="/js/dashboard.js"></script>
+</body>
+</html>

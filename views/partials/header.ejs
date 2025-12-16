@@ -1,0 +1,23 @@
+<header class="header">
+  <div class="header-content">
+    <div class="header-left">
+      <h1 class="logo">Felton Brushes</h1>
+      <span class="subtitle">Attendance Management</span>
+    </div>
+
+    <div class="header-right">
+      <% if (user) { %>
+        <div class="user-info">
+          <% if (user.profile_picture) { %>
+            <img src="<%= user.profile_picture %>" alt="<%= user.name %>" class="user-avatar">
+          <% } else { %>
+            <div class="user-avatar-placeholder"><%= user.name.charAt(0) %></div>
+          <% } %>
+          <span class="user-name"><%= user.name %></span>
+          <span class="user-role"><%= user.role %></span>
+        </div>
+        <a href="/logout" class="btn btn-secondary">Logout</a>
+      <% } %>
+    </div>
+  </div>
+</header>

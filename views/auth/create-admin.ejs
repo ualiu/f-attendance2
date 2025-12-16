@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Create Admin Account - Felton Brushes</title>
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body class="setup-page">
+  <div class="setup-container">
+    <div class="setup-card">
+      <h1>Create Administrator Account</h1>
+      <p>This is for initial setup only. Create the first admin account.</p>
+
+      <form action="/create-admin" method="POST" class="admin-form">
+        <div class="form-group">
+          <label for="name">Full Name</label>
+          <input type="text" name="name" id="name" required>
+        </div>
+
+        <div class="form-group">
+          <label for="email">Email</label>
+          <input type="email" name="email" id="email" required>
+        </div>
+
+        <div class="form-group">
+          <label for="password">Password</label>
+          <input type="password" name="password" id="password" required minlength="8">
+        </div>
+
+        <div class="form-group">
+          <label for="department">Department</label>
+          <select name="department" id="department" required>
+            <option value="">Select Department</option>
+            <option value="Production">Production</option>
+            <option value="Maintenance">Maintenance</option>
+            <option value="Management">Management</option>
+          </select>
+        </div>
+
+        <button type="submit" class="btn btn-primary">Create Admin Account</button>
+      </form>
+
+      <div class="form-footer">
+        <a href="/login">Back to Login</a>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

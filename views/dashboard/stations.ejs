@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title><%= title %> - Felton Brushes</title>
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <%- include('../partials/header') %>
+  <%- include('../partials/sidebar') %>
+
+  <main class="main-with-sidebar">
+    <h1><%= title %></h1>
+
+    <% Object.keys(stationsByLine).forEach(line => { %>
+      <div class="line-section">
+        <h2><%= line %></h2>
+        <div class="station-grid">
+          <% stationsByLine[line].forEach(station => { %>
+            <div class="station-card <%= station.isAffectedToday ? 'station-affected' : '' %>">
+              <div class="station-card-header">
+                <h4><%= station.name %></h4>
+                <% if (station.isAffectedToday) { %>
+                  <span class="badge badge-warning">Affected Today</span>
+                <% } %>
+                <% if (station.required_for_production) { %>
+                  <span class="badge badge-critical">Critical</span>
+                <% } %>
+              </div>
+              <div class="station-card-body">
+                <div class="station-info">
+                  <strong>Primary Worker:</strong>
+                  <% if (station.primary_worker) { %>
+                    <a href="/dashboard/employee/<%= station.primary_worker._id %>">
+                      <%= station.primary_worker.name %>
+                    </a>
+                  <% } else { %>
+                    <span class="text-warning">Unassigned</span>
+                  <% } %>
+                </div>
+                <div class="station-info">
+                  <strong>Backup Workers:</strong>
+                  <% if (station.backup_workers && station.backup_workers.length > 0) { %>
+                    <%= station.backup_workers.map(w => w.name).join(', ') %>
+                  <% } else { %>
+                    <span class="text-warning">None</span>
+                  <% } %>
+                </div>
+                <div class="station-info">
+                  <strong>Status:</strong>
+                  <% if (station.isAffectedToday) { %>
+                    <span class="text-warning">Down today</span>
+                  <% } else { %>
+                    <span class="text-success">Operational</span>
+                  <% } %>
+                </div>
+              </div>
+            </div>
+          <% }); %>
+        </div>
+      </div>
+    <% }); %>
+
+    <% if (Object.keys(stationsByLine).length === 0) { %>
+      <p class="no-data">No work stations configured yet. <a href="/admin/manage">Add stations</a></p>
+    <% } %>
+  </main>
+</body>
+</html>

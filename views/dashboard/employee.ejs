@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title><%= title %> - Felton Brushes</title>
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <%- include('../partials/header') %>
+  <%- include('../partials/sidebar') %>
+
+  <main class="main-with-sidebar">
+    <div class="employee-header">
+      <div>
+        <h1><%= employee.name %></h1>
+        <p class="employee-meta">
+          <%= employee.employee_id %> | <%= employee.department %> | <%= employee.shift %>
+        </p>
+      </div>
+      <div>
+        <span class="status-badge status-<%= employee.status %>" style="font-size: 1.1rem; padding: 0.5rem 1rem;">
+          <%= employee.status.replace('_', ' ') %>
+        </span>
+      </div>
+    </div>
+
+    <div class="stats-grid" style="margin: 2rem 0;">
+      <div class="stat-card">
+        <h3>Points This Quarter</h3>
+        <div class="stat-value" style="color: <%= employee.points_current_quarter >= 6 ? '#dc3545' : employee.points_current_quarter >= 4 ? '#ffc107' : '#28a745' %>;">
+          <%= employee.points_current_quarter %> / 6.0
+        </div>
+      </div>
+
+      <div class="stat-card">
+        <h3>Absences</h3>
+        <div class="stat-value"><%= employee.absences_this_quarter %></div>
+      </div>
+
+      <div class="stat-card">
+        <h3>Tardies</h3>
+        <div class="stat-value"><%= employee.tardies_this_quarter %></div>
+      </div>
+
+      <div class="stat-card">
+        <h3>Work Station</h3>
+        <div class="stat-value" style="font-size: 1.2rem;">
+          <%= employee.work_station || 'Not assigned' %>
+        </div>
+      </div>
+    </div>
+
+    <% if (station) { %>
+      <div class="section">
+        <h2>Work Station Details</h2>
+        <div style="background: white; padding: 1.5rem; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+          <p><strong>Station:</strong> <%= station.name %></p>
+          <p><strong>Critical:</strong> <%= station.required_for_production ? 'Yes' : 'No' %></p>
+          <p><strong>Backup Coverage:</strong>
+            <% if (station.backup_workers && station.backup_workers.length > 0) { %>
+              <%= station.backup_workers.length %> worker(s)
+            <% } else { %>
+              <span class="text-warning">None</span>
+            <% } %>
+          </p>
+        </div>
+      </div>
+    <% } %>
+
+    <div class="section">
+      <div class="section-header">
+        <h2>Absence History (This Quarter)</h2>
+        <small style="color: #666;">Starting <%= quarterStart.toLocaleDateString() %></small>
+      </div>
+
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>Date</th>
+            <th>Type</th>
+            <th>Reason</th>
+            <th>Points</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% if (absences.length === 0) { %>
+            <tr>
+              <td colspan="5" class="no-data">No absences this quarter</td>
+            </tr>
+          <% } else { %>
+            <% absences.forEach(absence => { %>
+              <tr>
+                <td><%= new Date(absence.date).toLocaleDateString() %></td>
+                <td><span class="type-badge type-<%= absence.type %>"><%= absence.type %></span></td>
+                <td><%= absence.reason %></td>
+                <td><%= absence.points_awarded %></td>
+                <td>
+                  <% if (absence.call_transcript) { %>
+                    <button onclick="viewTranscript('<%= absence._id %>')" class="btn-small">Transcript</button>
+                  <% } %>
+                  <% if (absence.call_recording_url) { %>
+                    <a href="<%= absence.call_recording_url %>" target="_blank" class="btn-small">Recording</a>
+                  <% } %>
+                </td>
+              </tr>
+            <% }); %>
+          <% } %>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="quick-actions">
+      <a href="/reports/employee?employeeId=<%= employee._id %>" class="btn btn-primary">Generate AI Report</a>
+      <a href="/dashboard" class="btn btn-secondary">Back to Dashboard</a>
+    </div>
+  </main>
+
+  <script src="/js/dashboard.js"></script>
+</body>
+</html>

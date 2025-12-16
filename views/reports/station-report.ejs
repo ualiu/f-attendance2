@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title><%= title %> - Felton Brushes</title>
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <%- include('../partials/header') %>
+  <%- include('../partials/sidebar') %>
+
+  <main class="main-with-sidebar">
+    <h1>Work Station Downtime Report</h1>
+    <p class="report-meta">
+      <% if (department) { %>
+        Department: <%= department %> |
+      <% } %>
+      Period: <%= new Date(startDate).toLocaleDateString() %> - <%= new Date(endDate).toLocaleDateString() %>
+      | Generated: <%= report.generated_at.toLocaleString() %>
+    </p>
+
+    <div class="report-section">
+      <h2>Stations Ranked by Downtime</h2>
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>Rank</th>
+            <th>Station</th>
+            <th>Days Down</th>
+            <th>Primary Worker</th>
+            <th>Primary Absence Rate</th>
+            <th>Backup Coverage</th>
+            <th>Critical</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% report.stationMetrics.forEach((station, idx) => { %>
+            <tr>
+              <td><%= idx + 1 %></td>
+              <td><strong><%= station.name %></strong></td>
+              <td><%= station.days_down %></td>
+              <td><%= station.primary_worker %></td>
+              <td><%= station.primary_absence_rate.toFixed(1) %>%</td>
+              <td>
+                <%= station.backup_count %> worker(s)
+                <% if (station.backup_count === 0) { %>
+                  <span style="color: #dc3545;"> ⚠️</span>
+                <% } %>
+              </td>
+              <td>
+                <% if (station.critical) { %>
+                  <span class="badge badge-critical">YES</span>
+                <% } else { %>
+                  No
+                <% } %>
+              </td>
+            </tr>
+          <% }); %>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="report-section ai-analysis">
+      <h2>AI Analysis by Claude</h2>
+      <div class="analysis-content">
+        <%= report.analysis %>
+      </div>
+    </div>
+
+    <div class="report-actions">
+      <button onclick="window.print()" class="btn btn-primary">Print Report</button>
+      <a href="/reports" class="btn btn-secondary">Generate Another Report</a>
+      <a href="/dashboard/stations" class="btn btn-secondary">View Stations</a>
+    </div>
+  </main>
+
+  <style>
+    .report-meta {
+      color: #666;
+      margin-bottom: 2rem;
+    }
+    .report-section {
+      background: white;
+      padding: 1.5rem;
+      margin-bottom: 1.5rem;
+      border-radius: 8px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    .ai-analysis {
+      border-left: 4px solid #0066cc;
+    }
+    .analysis-content {
+      white-space: pre-wrap;
+      line-height: 1.8;
+      color: #333;
+    }
+    .report-actions {
+      display: flex;
+      gap: 1rem;
+      margin-top: 2rem;
+    }
+    @media print {
+      .header, .sidebar, .report-actions {
+        display: none;
+      }
+      .main-with-sidebar {
+        margin-left: 0;
+      }
+    }
+  </style>
+</body>
+</html>

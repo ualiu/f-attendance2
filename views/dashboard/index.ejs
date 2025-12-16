@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title><%= title %> - Felton Brushes</title>
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <%- include('../partials/header') %>
+  <%- include('../partials/sidebar') %>
+
+  <main class="main-with-sidebar">
+    <div class="dashboard-header">
+      <h1><%= title %></h1>
+      <div class="date-info">
+        <%= new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }) %>
+      </div>
+    </div>
+
+    <!-- Today's Summary -->
+    <div class="stats-grid">
+      <div class="stat-card">
+        <h3>Total Employees</h3>
+        <div class="stat-value"><%= todaysSummary.totalEmployees %></div>
+      </div>
+
+      <div class="stat-card stat-success">
+        <h3>Present Today</h3>
+        <div class="stat-value"><%= todaysSummary.presentCount %></div>
+      </div>
+
+      <div class="stat-card stat-warning">
+        <h3>Absent Today</h3>
+        <div class="stat-value"><%= todaysSummary.absentCount %></div>
+      </div>
+
+      <div class="stat-card stat-info">
+        <h3>Late Today</h3>
+        <div class="stat-value"><%= todaysSummary.lateCount %></div>
+      </div>
+    </div>
+
+    <!-- Alerts Section -->
+    <% if (alertEmployees.length > 0) { %>
+      <div class="alert-section">
+        <h2>Employees At Risk (<%= alertEmployees.length %>)</h2>
+        <div class="alert-list">
+          <% alertEmployees.forEach(emp => { %>
+            <div class="alert-item alert-<%= emp.status %>">
+              <div class="alert-info">
+                <a href="/dashboard/employee/<%= emp._id %>" class="employee-name">
+                  <%= emp.name %>
+                </a>
+                <span class="employee-station"><%= emp.work_station || 'No station' %></span>
+              </div>
+              <div class="alert-points">
+                <span class="points"><%= emp.points_current_quarter %> / 6.0 pts</span>
+                <span class="status-badge status-<%= emp.status %>"><%= emp.status.replace('_', ' ') %></span>
+              </div>
+            </div>
+          <% }); %>
+        </div>
+      </div>
+    <% } %>
+
+    <!-- Affected Stations Today -->
+    <% if (affectedStations.length > 0) { %>
+      <div class="stations-section">
+        <h2>Affected Work Stations Today (<%= affectedStations.length %>)</h2>
+        <div class="station-list">
+          <% affectedStations.forEach(station => { %>
+            <div class="station-item station-<%= station.status %>">
+              <div class="station-name">
+                <%= station.name %>
+                <% if (station.status === 'critical') { %>
+                  <span class="badge badge-critical">CRITICAL</span>
+                <% } %>
+              </div>
+              <div class="station-details">
+                <% if (station.absences && station.absences.length > 0) { %>
+                  <% station.absences.forEach(absence => { %>
+                    <div class="absence-info">
+                      <%= absence.employee_name %> - <%= absence.type %>
+                    </div>
+                  <% }); %>
+                <% } %>
+                <div class="backup-info">
+                  Backup coverage: <%= station.backup_workers.length %> worker(s)
+                </div>
+              </div>
+            </div>
+          <% }); %>
+        </div>
+      </div>
+    <% } %>
+
+    <!-- Recent Calls -->
+    <div class="recent-calls-section">
+      <h2>Recent Calls</h2>
+      <table class="calls-table">
+        <thead>
+          <tr>
+            <th>Time</th>
+            <th>Employee</th>
+            <th>Type</th>
+            <th>Reason</th>
+            <th>Station</th>
+            <th>Points</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% if (recentCalls.length === 0) { %>
+            <tr>
+              <td colspan="7" class="no-data">No recent calls</td>
+            </tr>
+          <% } else { %>
+            <% recentCalls.forEach(call => { %>
+              <tr>
+                <td><%= call.call_time ? new Date(call.call_time).toLocaleString() : 'N/A' %></td>
+                <td>
+                  <a href="/dashboard/employee/<%= call.employee_id?._id %>">
+                    <%= call.employee_name %>
+                  </a>
+                </td>
+                <td><span class="type-badge type-<%= call.type %>"><%= call.type %></span></td>
+                <td><%= call.reason %></td>
+                <td><%= call.work_station %></td>
+                <td><%= call.points_awarded %></td>
+                <td>
+                  <% if (call.call_transcript) { %>
+                    <button onclick="viewTranscript('<%= call._id %>')" class="btn-small">Transcript</button>
+                  <% } %>
+                  <% if (call.call_recording_url) { %>
+                    <a href="<%= call.call_recording_url %>" target="_blank" class="btn-small">Recording</a>
+                  <% } %>
+                </td>
+              </tr>
+            <% }); %>
+          <% } %>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Quick Actions -->
+    <div class="quick-actions">
+      <h3>Quick Actions</h3>
+      <a href="/reports" class="btn btn-primary">Generate Report</a>
+      <a href="/dashboard/stations" class="btn btn-secondary">View All Stations</a>
+      <a href="/admin/manage" class="btn btn-secondary">Manage Employees</a>
+    </div>
+  </main>
+
+  <script src="/js/dashboard.js"></script>
+</body>
+</html>

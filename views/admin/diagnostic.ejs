@@ -1,0 +1,325 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Diagnostic Tool - Edit Button Issue</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 20px;
+      background-color: #f5f5f5;
+    }
+    .diagnostic-section {
+      background: white;
+      border-radius: 8px;
+      padding: 20px;
+      margin-bottom: 20px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    h1 {
+      color: #0066cc;
+    }
+    h2 {
+      color: #333;
+      border-bottom: 2px solid #0066cc;
+      padding-bottom: 10px;
+    }
+    .test-result {
+      padding: 10px;
+      margin: 10px 0;
+      border-radius: 4px;
+    }
+    .pass {
+      background-color: #d4edda;
+      border-left: 4px solid #28a745;
+    }
+    .fail {
+      background-color: #f8d7da;
+      border-left: 4px solid #dc3545;
+    }
+    .info {
+      background-color: #d1ecf1;
+      border-left: 4px solid #0c5460;
+      padding: 15px;
+      margin: 15px 0;
+    }
+    .test-button {
+      background-color: #0066cc;
+      color: white;
+      border: none;
+      padding: 12px 24px;
+      font-size: 16px;
+      border-radius: 4px;
+      cursor: pointer;
+      margin: 5px;
+    }
+    .test-button:hover {
+      background-color: #0052a3;
+    }
+    .station-card {
+      background-color: white;
+      border: 1px solid #e0e0e0;
+      border-radius: 8px;
+      padding: 1rem;
+      margin: 10px 0;
+    }
+    .station-card-actions {
+      display: flex !important;
+      gap: 0.5rem;
+      margin-top: 0.75rem;
+      padding-top: 0.75rem;
+      border-top: 1px solid #e0e0e0;
+      visibility: visible !important;
+      background-color: #f0f0f0;
+    }
+    .btn {
+      display: inline-block;
+      padding: 0.5rem 1rem;
+      border: none;
+      border-radius: 4px;
+      font-size: 0.95rem;
+      font-weight: 500;
+      cursor: pointer;
+    }
+    .btn-primary {
+      background-color: #0066cc;
+      color: white;
+    }
+    .btn-danger {
+      background-color: #dc3545;
+      color: white;
+    }
+    .btn-small {
+      padding: 0.25rem 0.5rem;
+      font-size: 0.85rem;
+    }
+    code {
+      background-color: #f4f4f4;
+      padding: 2px 6px;
+      border-radius: 3px;
+      font-family: 'Courier New', monospace;
+    }
+    pre {
+      background-color: #f4f4f4;
+      padding: 15px;
+      border-radius: 4px;
+      overflow-x: auto;
+    }
+  </style>
+</head>
+<body>
+  <h1>🔍 Edit Button Diagnostic Tool</h1>
+
+  <div class="info">
+    <strong>Purpose:</strong> This page will help us figure out why you can't see the Edit buttons on the Work Stations tab.
+    <br><br>
+    <strong>Instructions:</strong> Run the tests below and take note of which ones pass or fail. This will tell us exactly what's wrong.
+  </div>
+
+  <div class="diagnostic-section">
+    <h2>Test 1: Can You See This Button?</h2>
+    <p>This is a simple button test to ensure buttons can display on your browser:</p>
+    <button class="test-button" onclick="alert('SUCCESS! You can see and click buttons.')">
+      ✏️ Click Me - Test Button
+    </button>
+    <div id="test1-result" class="test-result" style="display:none;"></div>
+  </div>
+
+  <div class="diagnostic-section">
+    <h2>Test 2: Sample Station Card with Edit Button</h2>
+    <p>This is exactly how a station card should look with the Edit button visible:</p>
+
+    <div class="station-card">
+      <div class="station-card-header">
+        <h4>Test Station A</h4>
+        <span class="badge badge-critical" style="background-color: #dc3545; color: white; padding: 0.25rem 0.5rem; border-radius: 4px; font-size: 0.75rem;">Critical</span>
+      </div>
+      <div class="station-card-body">
+        <div class="station-info">
+          <strong>Primary:</strong> John Doe
+        </div>
+        <div class="station-info">
+          <strong>Backups:</strong> Jane Smith, Bob Wilson
+        </div>
+      </div>
+      <div class="station-card-actions" style="background-color: #f0f0f0 !important; display: flex !important;">
+        <button onclick="alert('Edit button clicked! This proves it works.')" class="btn btn-primary btn-small">
+          ✏️ Edit
+        </button>
+        <button onclick="alert('Delete button clicked!')" class="btn btn-danger btn-small">
+          Delete
+        </button>
+      </div>
+    </div>
+
+    <div class="info" style="margin-top: 15px;">
+      <strong>Question:</strong> Can you see the gray section at the bottom with "Edit" and "Delete" buttons?
+      <ul>
+        <li>✅ <strong>YES</strong> - The buttons work! The issue is with the main page.</li>
+        <li>❌ <strong>NO</strong> - Your browser may have issues with the CSS.</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="diagnostic-section">
+    <h2>Test 3: JavaScript Console Check</h2>
+    <p>Press <strong>F12</strong> right now and look at the Console tab.</p>
+    <button class="test-button" onclick="runConsoleTest()">Run Console Test</button>
+    <div id="console-result"></div>
+
+    <script>
+      function runConsoleTest() {
+        console.log('✅ DIAGNOSTIC: Console is working!');
+        console.log('📊 Testing editStation function...');
+
+        const resultDiv = document.getElementById('console-result');
+        resultDiv.innerHTML = `
+          <div class="test-result pass">
+            <strong>✅ Console Test Passed</strong><br>
+            Look at your Console (F12 → Console tab). You should see green checkmarks.
+            If you see RED errors, copy them and share them with me.
+          </div>
+        `;
+
+        // Test if editStation function exists in global scope
+        if (typeof window.editStation === 'function') {
+          console.log('✅ editStation function EXISTS in global scope');
+        } else {
+          console.warn('⚠️ editStation function NOT FOUND - This may be the issue!');
+        }
+      }
+    </script>
+  </div>
+
+  <div class="diagnostic-section">
+    <h2>Test 4: Fetch Station Data</h2>
+    <p>This test will check if your browser can load station data from the server:</p>
+    <button class="test-button" onclick="testFetchData()">Test Data Loading</button>
+    <div id="fetch-result"></div>
+
+    <script>
+      async function testFetchData() {
+        const resultDiv = document.getElementById('fetch-result');
+        resultDiv.innerHTML = '<p>Loading...</p>';
+
+        try {
+          const response = await fetch('/admin/setup/data');
+          if (!response.ok) {
+            throw new Error(`HTTP ${response.status}`);
+          }
+
+          const data = await response.json();
+
+          resultDiv.innerHTML = `
+            <div class="test-result pass">
+              <strong>✅ Data Loading Test Passed</strong><br>
+              Found ${data.stations.length} station(s) and ${data.employees.length} employee(s).
+              <br><br>
+              <strong>Stations:</strong>
+              <ul>
+                ${data.stations.map(s => `<li>${s.name} (ID: ${s._id})</li>`).join('')}
+              </ul>
+            </div>
+          `;
+        } catch (error) {
+          resultDiv.innerHTML = `
+            <div class="test-result fail">
+              <strong>❌ Data Loading Test Failed</strong><br>
+              Error: ${error.message}
+              <br><br>
+              This means your browser cannot communicate with the server properly.
+            </div>
+          `;
+        }
+      }
+    </script>
+  </div>
+
+  <div class="diagnostic-section">
+    <h2>Test 5: CSS Loading Check</h2>
+    <p>Checking if CSS styles are properly applied...</p>
+    <button class="test-button" onclick="testCSS()">Test CSS</button>
+    <div id="css-result"></div>
+
+    <script>
+      function testCSS() {
+        const testDiv = document.createElement('div');
+        testDiv.className = 'station-card-actions';
+        testDiv.style.cssText = 'width: 1px; height: 1px;';
+        document.body.appendChild(testDiv);
+
+        const computed = window.getComputedStyle(testDiv);
+        const display = computed.display;
+        const visibility = computed.visibility;
+
+        document.body.removeChild(testDiv);
+
+        const resultDiv = document.getElementById('css-result');
+
+        if (display === 'flex' && visibility === 'visible') {
+          resultDiv.innerHTML = `
+            <div class="test-result pass">
+              <strong>✅ CSS Test Passed</strong><br>
+              Display: ${display} (expected: flex)<br>
+              Visibility: ${visibility} (expected: visible)<br>
+              <br>
+              The CSS is loading correctly!
+            </div>
+          `;
+        } else {
+          resultDiv.innerHTML = `
+            <div class="test-result fail">
+              <strong>❌ CSS Test Failed</strong><br>
+              Display: ${display} (expected: flex)<br>
+              Visibility: ${visibility} (expected: visible)<br>
+              <br>
+              This means your CSS file is not loading properly!
+              <br><strong>Solution:</strong> Clear your browser cache or try a different browser.
+            </div>
+          `;
+        }
+      }
+    </script>
+  </div>
+
+  <div class="diagnostic-section">
+    <h2>📋 Summary & Next Steps</h2>
+    <p><strong>After running all tests above:</strong></p>
+    <ol>
+      <li>Note which tests PASSED (green) and which FAILED (red)</li>
+      <li>If Test 2 shows buttons → the issue is with the main manage page</li>
+      <li>If Test 2 doesn't show buttons → your browser has a compatibility issue</li>
+      <li>If any test fails → copy the error message</li>
+      <li>Check the browser console (F12 → Console) for any RED errors</li>
+    </ol>
+
+    <div class="info">
+      <strong>Quick Links:</strong><br>
+      <a href="/admin/manage">← Go to Main Management Page</a><br>
+      <a href="/test/test-stations">Go to Simple Test Page →</a>
+    </div>
+  </div>
+
+  <div class="diagnostic-section">
+    <h2>🔧 Common Solutions</h2>
+    <h3>If buttons don't appear anywhere:</h3>
+    <ul>
+      <li>Clear your browser cache completely (Ctrl+Shift+Delete)</li>
+      <li>Try a different browser (Chrome, Firefox, Edge)</li>
+      <li>Disable browser extensions temporarily</li>
+      <li>Check if JavaScript is enabled in your browser</li>
+    </ul>
+
+    <h3>If buttons appear HERE but not on /admin/manage:</h3>
+    <ul>
+      <li>The manage.ejs template may have an issue</li>
+      <li>Check browser console for JavaScript errors</li>
+      <li>The tab switching might be hiding the buttons</li>
+    </ul>
+  </div>
+
+</body>
+</html>

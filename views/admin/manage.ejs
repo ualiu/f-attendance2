@@ -1,0 +1,533 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Manage System - Felton Brushes</title>
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <%- include('../partials/header') %>
+  <%- include('../partials/sidebar') %>
+
+  <main class="main-with-sidebar">
+    <h1>System Management</h1>
+
+    <div class="management-tabs">
+      <button class="tab-btn active" onclick="showTab('employees')">Employees</button>
+      <button class="tab-btn" onclick="showTab('stations')">Work Stations</button>
+    </div>
+
+    <!-- Employees Tab -->
+    <div id="employees-tab" class="tab-content active">
+      <div class="section-header">
+        <h2>Employee Management</h2>
+        <button onclick="showAddEmployeeModal()" class="btn btn-primary">+ Add Employee</button>
+      </div>
+
+      <div class="search-bar">
+        <input type="text" id="employeeSearch" placeholder="Search employees..." onkeyup="searchEmployees()">
+      </div>
+
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>Name</th>
+            <th>Employee ID</th>
+            <th>Station</th>
+            <th>Points</th>
+            <th>Status</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody id="employeeTableBody">
+          <% if (employees.length === 0) { %>
+            <tr>
+              <td colspan="6" class="no-data">No employees yet. Add your first employee above.</td>
+            </tr>
+          <% } else { %>
+            <% employees.forEach(emp => { %>
+              <tr>
+                <td><a href="/dashboard/employee/<%= emp._id %>"><%= emp.name %></a></td>
+                <td><%= emp.employee_id %></td>
+                <td><%= emp.work_station || 'Not assigned' %></td>
+                <td><%= emp.points_current_quarter %> / 6.0</td>
+                <td><span class="status-badge status-<%= emp.status %>"><%= emp.status %></span></td>
+                <td>
+                  <button onclick="editEmployee('<%= emp._id %>')" class="btn-small">Edit</button>
+                  <button onclick="deleteEmployee('<%= emp._id %>')" class="btn-small btn-danger">Delete</button>
+                </td>
+              </tr>
+            <% }); %>
+          <% } %>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Stations Tab -->
+    <div id="stations-tab" class="tab-content">
+      <div class="section-header">
+        <h2>Work Station Management</h2>
+        <button onclick="showAddStationModal()" class="btn btn-primary">+ Add Station</button>
+      </div>
+
+      <% Object.keys(stationsByLine).forEach(line => { %>
+        <div class="line-section">
+          <h3><%= line %></h3>
+          <div class="station-grid">
+            <% stationsByLine[line].forEach(station => { %>
+              <div class="station-card">
+                <div class="station-card-header">
+                  <h4><%= station.name %></h4>
+                  <% if (station.required_for_production) { %>
+                    <span class="badge badge-critical">Critical</span>
+                  <% } %>
+                </div>
+                <div class="station-card-body">
+                  <div class="station-info">
+                    <strong>Primary:</strong>
+                    <%= station.primary_worker ? station.primary_worker.name : 'Unassigned' %>
+                  </div>
+                  <div class="station-info">
+                    <strong>Backups:</strong>
+                    <% if (station.backup_workers.length > 0) { %>
+                      <%= station.backup_workers.map(w => w.name).join(', ') %>
+                    <% } else { %>
+                      <span class="text-warning">None</span>
+                    <% } %>
+                  </div>
+                </div>
+                <div class="station-card-actions">
+                  <button onclick="editStation('<%= station._id %>')" class="btn btn-primary btn-small">
+                    ✏️ Edit
+                  </button>
+                  <button onclick="deleteStation('<%= station._id %>')" class="btn btn-danger btn-small">
+                    Delete
+                  </button>
+                </div>
+              </div>
+            <% }); %>
+          </div>
+        </div>
+      <% }); %>
+
+      <% if (Object.keys(stationsByLine).length === 0) { %>
+        <p class="no-data">No work stations yet. Add your first station above.</p>
+      <% } %>
+    </div>
+  </main>
+
+  <!-- Add Employee Modal -->
+  <div id="addEmployeeModal" class="modal" style="display: none;">
+    <div class="modal-content">
+      <h2>Add Employee</h2>
+      <form id="addEmployeeForm" onsubmit="addEmployee(event)">
+        <div class="form-group">
+          <label>Name</label>
+          <input type="text" name="name" required>
+        </div>
+        <div class="form-group">
+          <label>Employee ID</label>
+          <input type="text" name="employee_id" required>
+        </div>
+        <div class="form-group">
+          <label>Phone</label>
+          <input type="tel" name="phone" required>
+        </div>
+        <div class="form-group">
+          <label>Department</label>
+          <select name="department" required>
+            <option value="Production">Production</option>
+            <option value="Maintenance">Maintenance</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Shift</label>
+          <select name="shift" required>
+            <option value="Day (7am-3:30pm)">Day (7am-3:30pm)</option>
+            <option value="Afternoon (3:30pm-12am)">Afternoon (3:30pm-12am)</option>
+            <option value="Night (12am-7am)">Night (12am-7am)</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Work Station (Optional)</label>
+          <select name="work_station">
+            <option value="">Not assigned</option>
+            <% stations.forEach(station => { %>
+              <option value="<%= station.name %>"><%= station.name %></option>
+            <% }); %>
+          </select>
+        </div>
+        <div class="modal-actions">
+          <button type="submit" class="btn btn-primary">Add Employee</button>
+          <button type="button" onclick="closeModal('addEmployeeModal')" class="btn btn-secondary">Cancel</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Edit Employee Modal -->
+  <div id="editEmployeeModal" class="modal" style="display: none;">
+    <div class="modal-content">
+      <h2>Edit Employee</h2>
+      <form id="editEmployeeForm" onsubmit="updateEmployee(event)">
+        <input type="hidden" name="employee_id" id="edit_employee_id">
+
+        <div class="form-group">
+          <label>Name</label>
+          <input type="text" name="name" id="edit_name" required>
+        </div>
+        <div class="form-group">
+          <label>Employee ID</label>
+          <input type="text" id="edit_employee_code" disabled>
+        </div>
+        <div class="form-group">
+          <label>Phone</label>
+          <input type="tel" name="phone" id="edit_phone" required>
+        </div>
+        <div class="form-group">
+          <label>Department</label>
+          <select name="department" id="edit_department" required>
+            <option value="Production">Production</option>
+            <option value="Maintenance">Maintenance</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Shift</label>
+          <select name="shift" id="edit_shift" required>
+            <option value="Day (7am-3:30pm)">Day (7am-3:30pm)</option>
+            <option value="Afternoon (3:30pm-12am)">Afternoon (3:30pm-12am)</option>
+            <option value="Night (12am-7am)">Night (12am-7am)</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Work Station</label>
+          <select name="work_station" id="edit_work_station">
+            <option value="">Not assigned</option>
+            <% stations.forEach(station => { %>
+              <option value="<%= station.name %>"><%= station.name %></option>
+            <% }); %>
+          </select>
+        </div>
+        <div class="modal-actions">
+          <button type="submit" class="btn btn-primary">Update Employee</button>
+          <button type="button" onclick="closeModal('editEmployeeModal')" class="btn btn-secondary">Cancel</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Add Station Modal -->
+  <div id="addStationModal" class="modal" style="display: none;">
+    <div class="modal-content">
+      <h2>Add Work Station</h2>
+      <form id="addStationForm" onsubmit="addStation(event)">
+        <div class="form-group">
+          <label>Line/Area</label>
+          <input type="text" name="line" placeholder="Line 1" required>
+        </div>
+        <div class="form-group">
+          <label>Station Name</label>
+          <input type="text" name="stationName" placeholder="Station A" required>
+        </div>
+        <div class="form-group">
+          <label>Department</label>
+          <select name="department" required>
+            <option value="Production">Production</option>
+            <option value="Maintenance">Maintenance</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>
+            <input type="checkbox" name="critical" checked>
+            Critical for production
+          </label>
+        </div>
+        <div class="modal-actions">
+          <button type="submit" class="btn btn-primary">Add Station</button>
+          <button type="button" onclick="closeModal('addStationModal')" class="btn btn-secondary">Cancel</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Edit Station Modal -->
+  <div id="editStationModal" class="modal" style="display: none;">
+    <div class="modal-content" style="max-width: 600px;">
+      <h2>Edit Work Station</h2>
+      <form id="editStationForm" onsubmit="updateStation(event)">
+        <input type="hidden" name="station_id" id="edit_station_id">
+
+        <div class="form-group">
+          <label>Station Name</label>
+          <input type="text" id="edit_station_name" disabled style="background-color: #f5f5f5;">
+        </div>
+
+        <div class="form-group">
+          <label>Department</label>
+          <select name="department" id="edit_station_department" required>
+            <option value="Production">Production</option>
+            <option value="Maintenance">Maintenance</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label>
+            <input type="checkbox" name="critical" id="edit_station_critical">
+            Critical for production
+          </label>
+        </div>
+
+        <hr style="margin: 1.5rem 0; border: none; border-top: 1px solid #e0e0e0;">
+
+        <div class="form-group">
+          <label>Primary Worker</label>
+          <select name="primary_worker" id="edit_station_primary">
+            <option value="">Unassigned</option>
+            <% employees.forEach(emp => { %>
+              <option value="<%= emp._id %>"><%= emp.name %> (<%= emp.employee_id %>)</option>
+            <% }); %>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label>Backup Workers</label>
+          <div style="border: 1px solid #ddd; border-radius: 4px; padding: 0.75rem; max-height: 200px; overflow-y: auto;">
+            <% employees.forEach(emp => { %>
+              <label style="display: block; margin-bottom: 0.5rem;">
+                <input type="checkbox" name="backup_workers" value="<%= emp._id %>" class="backup-checkbox">
+                <%= emp.name %> (<%= emp.employee_id %>)
+              </label>
+            <% }); %>
+            <% if (employees.length === 0) { %>
+              <p style="color: #999; font-style: italic;">No employees available. Add employees first.</p>
+            <% } %>
+          </div>
+          <small style="color: #666; display: block; margin-top: 0.5rem;">
+            Check all employees who can work at this station as backup
+          </small>
+        </div>
+
+        <div class="modal-actions">
+          <button type="submit" class="btn btn-primary">Update Station</button>
+          <button type="button" onclick="closeModal('editStationModal')" class="btn btn-secondary">Cancel</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script>
+    function showTab(tab) {
+      document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+      document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+      document.getElementById(tab + '-tab').classList.add('active');
+      event.target.classList.add('active');
+    }
+
+    function showAddEmployeeModal() {
+      document.getElementById('addEmployeeModal').style.display = 'flex';
+    }
+
+    function showAddStationModal() {
+      document.getElementById('addStationModal').style.display = 'flex';
+    }
+
+    function closeModal(modalId) {
+      document.getElementById(modalId).style.display = 'none';
+    }
+
+    async function addEmployee(e) {
+      e.preventDefault();
+      const formData = new FormData(e.target);
+      const data = Object.fromEntries(formData);
+
+      const response = await fetch('/api/employees', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data)
+      });
+
+      if (response.ok) {
+        location.reload();
+      } else {
+        alert('Error adding employee');
+      }
+    }
+
+    async function addStation(e) {
+      e.preventDefault();
+      const formData = new FormData(e.target);
+      const data = Object.fromEntries(formData);
+      data.critical = formData.has('critical');
+
+      const response = await fetch('/admin/stations', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data)
+      });
+
+      if (response.ok) {
+        location.reload();
+      } else {
+        alert('Error adding station');
+      }
+    }
+
+    async function deleteEmployee(id) {
+      if (!confirm('Are you sure you want to delete this employee?')) return;
+
+      const response = await fetch(`/api/employees/${id}`, { method: 'DELETE' });
+      if (response.ok) {
+        location.reload();
+      } else {
+        alert('Error deleting employee');
+      }
+    }
+
+    async function deleteStation(id) {
+      if (!confirm('Are you sure you want to delete this station?')) return;
+
+      const response = await fetch(`/admin/stations/${id}`, { method: 'DELETE' });
+      if (response.ok) {
+        location.reload();
+      } else {
+        alert('Error deleting station');
+      }
+    }
+
+    async function editEmployee(id) {
+      // Fetch employee data
+      const response = await fetch(`/api/employees/${id}`);
+      if (!response.ok) {
+        alert('Error loading employee data');
+        return;
+      }
+
+      const { employee } = await response.json();
+
+      // Populate form
+      document.getElementById('edit_employee_id').value = employee._id;
+      document.getElementById('edit_name').value = employee.name;
+      document.getElementById('edit_employee_code').value = employee.employee_id;
+      document.getElementById('edit_phone').value = employee.phone;
+      document.getElementById('edit_department').value = employee.department;
+      document.getElementById('edit_shift').value = employee.shift;
+      document.getElementById('edit_work_station').value = employee.work_station || '';
+
+      // Show modal
+      document.getElementById('editEmployeeModal').style.display = 'flex';
+    }
+
+    async function updateEmployee(e) {
+      e.preventDefault();
+      const formData = new FormData(e.target);
+      const data = Object.fromEntries(formData);
+      const employeeId = data.employee_id;
+      delete data.employee_id;
+
+      const response = await fetch(`/api/employees/${employeeId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data)
+      });
+
+      if (response.ok) {
+        closeModal('editEmployeeModal');
+        location.reload();
+      } else {
+        alert('Error updating employee');
+      }
+    }
+
+    async function editStation(id) {
+      // Fetch station data from the page (already loaded)
+      const response = await fetch(`/admin/setup/data`);
+      if (!response.ok) {
+        alert('Error loading station data');
+        return;
+      }
+
+      const { stations } = await response.json();
+      const station = stations.find(s => s._id === id);
+
+      if (!station) {
+        alert('Station not found');
+        return;
+      }
+
+      // Populate form
+      document.getElementById('edit_station_id').value = station._id;
+      document.getElementById('edit_station_name').value = station.name;
+      document.getElementById('edit_station_department').value = station.department;
+      document.getElementById('edit_station_critical').checked = station.required_for_production;
+
+      // Set primary worker
+      const primarySelect = document.getElementById('edit_station_primary');
+      primarySelect.value = station.primary_worker?._id || '';
+
+      // Set backup workers
+      const backupCheckboxes = document.querySelectorAll('.backup-checkbox');
+      backupCheckboxes.forEach(checkbox => {
+        checkbox.checked = false;
+        if (station.backup_workers) {
+          const isBackup = station.backup_workers.some(w => w._id === checkbox.value);
+          checkbox.checked = isBackup;
+        }
+      });
+
+      // Show modal
+      document.getElementById('editStationModal').style.display = 'flex';
+    }
+
+    async function updateStation(e) {
+      e.preventDefault();
+      const formData = new FormData(e.target);
+      const stationId = formData.get('station_id');
+
+      // Get selected backup workers
+      const backupWorkers = [];
+      formData.getAll('backup_workers').forEach(id => {
+        if (id) backupWorkers.push(id);
+      });
+
+      const data = {
+        department: formData.get('department'),
+        critical: formData.has('critical'),
+        primary_worker: formData.get('primary_worker') || null,
+        backup_workers: backupWorkers
+      };
+
+      const response = await fetch(`/admin/stations/${stationId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data)
+      });
+
+      if (response.ok) {
+        closeModal('editStationModal');
+        location.reload();
+      } else {
+        const error = await response.json();
+        alert('Error updating station: ' + (error.error || 'Unknown error'));
+      }
+    }
+
+    function searchEmployees() {
+      const searchValue = document.getElementById('employeeSearch').value.toLowerCase();
+      const rows = document.querySelectorAll('#employeeTableBody tr');
+
+      rows.forEach(row => {
+        const text = row.textContent.toLowerCase();
+        row.style.display = text.includes(searchValue) ? '' : 'none';
+      });
+    }
+
+    // Close modals when clicking outside
+    window.onclick = function(event) {
+      if (event.target.classList.contains('modal')) {
+        event.target.style.display = 'none';
+      }
+    }
+  </script>
+</body>
+</html>

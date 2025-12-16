@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>User Management - Felton Brushes</title>
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <%- include('../partials/header') %>
+  <%- include('../partials/sidebar') %>
+
+  <main class="main-with-sidebar">
+    <h1>User Management</h1>
+    <p class="subtitle">Manage supervisor and admin accounts</p>
+
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Email</th>
+          <th>Role</th>
+          <th>Department</th>
+          <th>Status</th>
+          <th>Last Login</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        <% if (supervisors.length === 0) { %>
+          <tr>
+            <td colspan="7" class="no-data">No users found</td>
+          </tr>
+        <% } else { %>
+          <% supervisors.forEach(supervisor => { %>
+            <tr>
+              <td>
+                <% if (supervisor.profile_picture) { %>
+                  <img src="<%= supervisor.profile_picture %>" alt="<%= supervisor.name %>"
+                       style="width: 24px; height: 24px; border-radius: 50%; vertical-align: middle; margin-right: 0.5rem;">
+                <% } %>
+                <%= supervisor.name %>
+              </td>
+              <td><%= supervisor.email %></td>
+              <td>
+                <select onchange="changeRole('<%= supervisor._id %>', this.value)"
+                        style="padding: 0.25rem; border: 1px solid #ddd; border-radius: 4px;">
+                  <option value="admin" <%= supervisor.role === 'admin' ? 'selected' : '' %>>Admin</option>
+                  <option value="supervisor" <%= supervisor.role === 'supervisor' ? 'selected' : '' %>>Supervisor</option>
+                  <option value="manager" <%= supervisor.role === 'manager' ? 'selected' : '' %>>Manager</option>
+                </select>
+              </td>
+              <td><%= supervisor.department || 'N/A' %></td>
+              <td>
+                <span class="status-badge <%= supervisor.is_active ? 'status-good' : 'status-review_required' %>">
+                  <%= supervisor.is_active ? 'Active' : 'Disabled' %>
+                </span>
+              </td>
+              <td>
+                <% if (supervisor.last_login) { %>
+                  <%= new Date(supervisor.last_login).toLocaleDateString() %>
+                <% } else { %>
+                  Never
+                <% } %>
+              </td>
+              <td>
+                <button onclick="toggleUser('<%= supervisor._id %>')" class="btn-small">
+                  <%= supervisor.is_active ? 'Disable' : 'Enable' %>
+                </button>
+              </td>
+            </tr>
+          <% }); %>
+        <% } %>
+      </tbody>
+    </table>
+  </main>
+
+  <script>
+    async function toggleUser(userId) {
+      if (!confirm('Are you sure you want to toggle this user\'s status?')) return;
+
+      const response = await fetch(`/admin/users/${userId}/toggle`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' }
+      });
+
+      if (response.ok) {
+        location.reload();
+      } else {
+        alert('Error toggling user status');
+      }
+    }
+
+    async function changeRole(userId, newRole) {
+      if (!confirm(`Are you sure you want to change this user's role to ${newRole}?`)) {
+        location.reload(); // Reset the select
+        return;
+      }
+
+      const response = await fetch(`/admin/users/${userId}/role`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ role: newRole })
+      });
+
+      if (response.ok) {
+        alert('Role updated successfully');
+      } else {
+        alert('Error updating role');
+        location.reload();
+      }
+    }
+  </script>
+</body>
+</html>

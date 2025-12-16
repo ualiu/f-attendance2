@@ -1,0 +1,30 @@
+<aside class="sidebar">
+  <nav class="sidebar-nav">
+    <a href="/dashboard" class="sidebar-link">
+      <span class="icon">📊</span>
+      <span>Dashboard</span>
+    </a>
+
+    <a href="/dashboard/stations" class="sidebar-link">
+      <span class="icon">🏭</span>
+      <span>Work Stations</span>
+    </a>
+
+    <a href="/reports" class="sidebar-link">
+      <span class="icon">📈</span>
+      <span>Reports</span>
+    </a>
+
+    <a href="/admin/manage" class="sidebar-link">
+      <span class="icon">⚙️</span>
+      <span>Manage</span>
+    </a>
+
+    <% if (user && user.role === 'admin') { %>
+      <a href="/admin/users" class="sidebar-link">
+        <span class="icon">👥</span>
+        <span>Users</span>
+      </a>
+    <% } %>
+  </nav>
+</aside>
