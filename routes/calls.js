@@ -48,20 +48,26 @@ router.post('/vapi-function', async (req, res) => {
   try {
     const { functionName, parameters } = req.body;
 
-    console.log(`VAPI function call: ${functionName}`, parameters);
+    console.log(`\n🔔 VAPI function call received:`);
+    console.log(`   Function: ${functionName}`);
+    console.log(`   Parameters:`, JSON.stringify(parameters, null, 2));
 
     // Execute the appropriate function from vapiService
     if (vapiService.vapiFunction[functionName]) {
       const result = await vapiService.vapiFunction[functionName](parameters);
+
+      console.log(`   Result:`, JSON.stringify(result, null, 2));
+
       return res.json(result);
     }
 
+    console.log(`   ❌ Function ${functionName} not found`);
     return res.status(404).json({
       success: false,
       error: `Function ${functionName} not found`
     });
   } catch (error) {
-    console.error('Error executing VAPI function:', error);
+    console.error('❌ Error executing VAPI function:', error);
     res.status(500).json({
       success: false,
       error: error.message
@@ -81,8 +87,10 @@ router.post('/vapi-webhook', async (req, res) => {
       transcript,
       call,
       messages,
-      functionCalls = []
+      artifact = {}
     } = callData;
+
+    const functionCalls = artifact.functionCalls || callData.functionCalls || [];
 
     // Find the log_absence or log_tardy function call
     const absenceCall = functionCalls.find(fc => fc.name === 'log_absence');
@@ -93,94 +101,51 @@ router.post('/vapi-webhook', async (req, res) => {
       return res.json({ success: true, message: 'Call completed, no absence logged' });
     }
 
-    // Process absence
-    if (absenceCall) {
-      const { employee_id, type, reason, expected_return, work_station } = absenceCall.parameters;
+    // Get employee_id from whichever function was called
+    const employeeIdParam = absenceCall?.parameters?.employee_id || tardyCall?.parameters?.employee_id;
 
-      // Find employee
-      const employee = await Employee.findOne({ employee_id });
-
-      if (!employee) {
-        console.error('Employee not found:', employee_id);
-        return res.status(404).json({ success: false, error: 'Employee not found' });
-      }
-
-      // Calculate points
-      const pointsAwarded = attendanceService.calculatePointsToAward(type);
-
-      // Check notice time
-      const callTime = new Date(call?.startedAt || Date.now());
-      const noticeCheck = attendanceService.checkNoticeTime(employee, callTime);
-
-      // Check station impact
-      const stationImpact = await attendanceService.checkStationImpact(work_station || employee.work_station);
-
-      // Create absence record
-      const absence = await Absence.create({
-        employee_id: employee._id,
-        employee_name: employee.name,
-        work_station: work_station || employee.work_station,
-        date: new Date(),
-        type,
-        reason,
-        expected_return: expected_return ? new Date(expected_return) : null,
-        call_time: callTime,
-        call_duration: call?.duration || 0,
-        call_recording_url: call?.recordingUrl || null,
-        call_transcript: transcript || null,
-        points_awarded: pointsAwarded,
-        late_notice: noticeCheck.isLateNotice,
-        station_impacted: stationImpact.impacted
-      });
-
-      // Update employee stats
-      await attendanceService.updateEmployeeStats(employee._id);
-
-      console.log(`Absence logged for ${employee.name}: ${type} - ${reason}`);
-
-      res.json({
-        success: true,
-        absence,
-        employee: await Employee.findById(employee._id)
-      });
+    if (!employeeIdParam) {
+      console.log('No employee_id in function call parameters');
+      return res.json({ success: true, message: 'Call completed, no employee identified' });
     }
 
-    // Process tardy
-    if (tardyCall) {
-      const { employee_id, minutes_late, reason } = tardyCall.parameters;
+    // Find employee
+    const employee = await Employee.findOne({ employee_id: employeeIdParam });
 
-      const employee = await Employee.findOne({ employee_id });
+    if (!employee) {
+      console.error('Employee not found:', employeeIdParam);
+      return res.status(404).json({ success: false, error: 'Employee not found' });
+    }
 
-      if (!employee) {
-        return res.status(404).json({ success: false, error: 'Employee not found' });
-      }
+    // Find the most recent absence record for this employee (created during the call)
+    const callStartTime = new Date(call?.startedAt || Date.now());
+    const fiveMinutesAgo = new Date(callStartTime.getTime() - 5 * 60 * 1000);
 
-      const callTime = new Date(call?.startedAt || Date.now());
-      const noticeCheck = attendanceService.checkNoticeTime(employee, callTime);
+    const existingAbsence = await Absence.findOne({
+      employee_id: employee._id,
+      call_time: { $gte: fiveMinutesAgo }
+    }).sort({ call_time: -1 });
 
-      const absence = await Absence.create({
-        employee_id: employee._id,
-        employee_name: employee.name,
-        work_station: employee.work_station,
-        date: new Date(),
-        type: 'late',
-        reason: `${minutes_late} minutes late - ${reason}`,
-        call_time: callTime,
-        call_duration: call?.duration || 0,
-        call_recording_url: call?.recordingUrl || null,
-        call_transcript: transcript || null,
-        points_awarded: 0.33,
-        late_notice: noticeCheck.isLateNotice
-      });
+    if (existingAbsence) {
+      // Update existing record with transcript and call details
+      existingAbsence.call_transcript = transcript || null;
+      existingAbsence.call_duration = call?.duration || existingAbsence.call_duration || 0;
+      existingAbsence.call_recording_url = call?.recordingUrl || null;
 
-      await attendanceService.updateEmployeeStats(employee._id);
+      await existingAbsence.save();
 
-      console.log(`Tardy logged for ${employee.name}: ${minutes_late} minutes late`);
+      console.log(`✅ Updated absence record with transcript for ${employee.name}`);
 
-      res.json({
+      return res.json({
         success: true,
-        absence,
-        employee: await Employee.findById(employee._id)
+        message: 'Transcript saved',
+        absence: existingAbsence
+      });
+    } else {
+      console.log(`⚠️ No recent absence record found for ${employee.name} to update with transcript`);
+      return res.json({
+        success: true,
+        message: 'No recent absence record found to update'
       });
     }
   } catch (error) {
@@ -221,6 +186,21 @@ router.get('/', async (req, res) => {
       .limit(parseInt(limit));
 
     res.json({ success: true, calls });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Get specific absence/call by ID
+router.get('/:id', async (req, res) => {
+  try {
+    const absence = await Absence.findById(req.params.id).populate('employee_id');
+
+    if (!absence) {
+      return res.status(404).json({ success: false, error: 'Record not found' });
+    }
+
+    res.json({ success: true, absence });
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
   }

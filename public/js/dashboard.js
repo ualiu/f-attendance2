@@ -32,21 +32,22 @@ function updateDashboard(data) {
 }
 
 // View transcript modal
-function viewTranscript(absenceId) {
-  fetch(`/api/calls?employee_id=${absenceId}`)
-    .then(res => res.json())
-    .then(data => {
-      const absence = data.calls.find(c => c._id === absenceId);
-      if (absence && absence.call_transcript) {
-        showModal('Transcript', absence.call_transcript);
-      } else {
-        alert('Transcript not available');
-      }
-    })
-    .catch(err => {
-      console.error('Error loading transcript:', err);
-      alert('Error loading transcript');
-    });
+async function viewTranscript(absenceId) {
+  try {
+    const response = await fetch(`/api/calls/${absenceId}`);
+    if (!response.ok) throw new Error('Failed to fetch transcript');
+
+    const data = await response.json();
+
+    if (data.success && data.absence.call_transcript) {
+      showModal('Call Transcript', data.absence.call_transcript);
+    } else {
+      alert('Transcript not available for this call');
+    }
+  } catch (err) {
+    console.error('Error loading transcript:', err);
+    alert('Error loading transcript');
+  }
 }
 
 function showModal(title, content) {

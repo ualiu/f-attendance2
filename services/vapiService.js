@@ -31,7 +31,7 @@ exports.getEmployeeByPhone = async (phone) => {
 
   const employee = await Employee.findOne({
     phone: { $regex: normalizedPhone }
-  }).populate('supervisor_id');
+  });
 
   return employee;
 };
@@ -40,7 +40,7 @@ exports.getEmployeeByPhone = async (phone) => {
 exports.getEmployeeByName = async (name) => {
   const employee = await Employee.findOne({
     name: { $regex: new RegExp(name, 'i') }
-  }).populate('supervisor_id');
+  });
 
   return employee;
 };
@@ -84,23 +84,120 @@ exports.vapiFunction = {
   log_absence: async (params) => {
     const { employee_id, type, reason, expected_return, work_station } = params;
 
-    // This will be called by the call controller after Vapi webhook
-    return {
-      success: true,
-      message: 'Absence logged',
-      data: { employee_id, type, reason, expected_return, work_station }
-    };
+    try {
+      const Employee = require('../models/Employee');
+      const Absence = require('../models/Absence');
+      const attendanceService = require('./attendanceService');
+
+      // Find employee
+      const employee = await Employee.findOne({ employee_id });
+
+      if (!employee) {
+        return {
+          success: false,
+          message: 'Employee not found'
+        };
+      }
+
+      // Calculate points
+      const pointsAwarded = attendanceService.calculatePointsToAward(type);
+
+      // Check notice time
+      const callTime = new Date();
+      const noticeCheck = attendanceService.checkNoticeTime(employee, callTime);
+
+      // Check station impact
+      const stationImpact = await attendanceService.checkStationImpact(work_station || employee.work_station);
+
+      // Create absence record
+      const absence = await Absence.create({
+        employee_id: employee._id,
+        employee_name: employee.name,
+        work_station: work_station || employee.work_station,
+        date: new Date(),
+        type,
+        reason,
+        expected_return: expected_return ? new Date(expected_return) : null,
+        call_time: callTime,
+        call_duration: 0,
+        call_transcript: null, // Will be updated by webhook
+        points_awarded: pointsAwarded,
+        late_notice: noticeCheck.isLateNotice,
+        station_impacted: stationImpact.impacted
+      });
+
+      // Update employee stats
+      await attendanceService.updateEmployeeStats(employee._id);
+
+      console.log(`✅ Absence logged for ${employee.name}: ${type} - ${reason}`);
+
+      return {
+        success: true,
+        message: `Logged. Absence recorded for ${employee.name}.`,
+        points_added: pointsAwarded,
+        total_points: employee.points_current_quarter + pointsAwarded
+      };
+    } catch (error) {
+      console.error('Error logging absence:', error);
+      return {
+        success: false,
+        message: 'Error logging absence: ' + error.message
+      };
+    }
   },
 
   // Log tardy
   log_tardy: async (params) => {
     const { employee_id, minutes_late, reason } = params;
 
-    return {
-      success: true,
-      message: 'Tardy logged',
-      data: { employee_id, minutes_late, reason }
-    };
+    try {
+      const Employee = require('../models/Employee');
+      const Absence = require('../models/Absence');
+      const attendanceService = require('./attendanceService');
+
+      const employee = await Employee.findOne({ employee_id });
+
+      if (!employee) {
+        return {
+          success: false,
+          message: 'Employee not found'
+        };
+      }
+
+      const callTime = new Date();
+      const noticeCheck = attendanceService.checkNoticeTime(employee, callTime);
+
+      const absence = await Absence.create({
+        employee_id: employee._id,
+        employee_name: employee.name,
+        work_station: employee.work_station,
+        date: new Date(),
+        type: 'late',
+        reason: `${minutes_late} minutes late - ${reason}`,
+        call_time: callTime,
+        call_duration: 0,
+        call_transcript: null,
+        points_awarded: 0.33,
+        late_notice: noticeCheck.isLateNotice
+      });
+
+      await attendanceService.updateEmployeeStats(employee._id);
+
+      console.log(`✅ Tardy logged for ${employee.name}: ${minutes_late} minutes late`);
+
+      return {
+        success: true,
+        message: `Logged. Tardy recorded for ${employee.name}.`,
+        points_added: 0.33,
+        total_points: employee.points_current_quarter + 0.33
+      };
+    } catch (error) {
+      console.error('Error logging tardy:', error);
+      return {
+        success: false,
+        message: 'Error logging tardy: ' + error.message
+      };
+    }
   },
 
   // Check threshold status
