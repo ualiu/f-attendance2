@@ -149,6 +149,7 @@ router.get('/check-users', async (req, res) => {
               <strong>${s.name}</strong> (${s.email})<br>
               Role: ${s.role}<br>
               Has password: ${s.password_hash ? 'Yes ✅' : 'No ❌ (Google only)'}<br>
+              Password hash: ${s.password_hash ? s.password_hash.substring(0, 20) + '...' : 'none'}<br>
               Active: ${s.is_active ? 'Yes' : 'No'}
             </li>
           `).join('')}
@@ -156,10 +157,70 @@ router.get('/check-users', async (req, res) => {
       `}
       <hr>
       <p><a href="/login">Go to Login</a></p>
+      <p><a href="/test/test-login">Test Login Function</a></p>
     `);
   } catch (error) {
     res.status(500).send(`Error: ${error.message}`);
   }
+});
+
+// Test: Test login function
+router.post('/test-login', async (req, res) => {
+  try {
+    const Supervisor = require('../models/Supervisor');
+    const bcrypt = require('bcrypt');
+    const { email, password } = req.body;
+
+    const supervisor = await Supervisor.findOne({ email });
+
+    if (!supervisor) {
+      return res.json({
+        success: false,
+        error: 'User not found',
+        email: email
+      });
+    }
+
+    if (!supervisor.password_hash) {
+      return res.json({
+        success: false,
+        error: 'No password set for this account',
+        email: email,
+        hasPasswordHash: false
+      });
+    }
+
+    const isMatch = await bcrypt.compare(password, supervisor.password_hash);
+
+    res.json({
+      success: isMatch,
+      email: email,
+      hasPasswordHash: true,
+      passwordMatch: isMatch,
+      isActive: supervisor.is_active,
+      role: supervisor.role
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+router.get('/test-login', (req, res) => {
+  res.send(`
+    <h1>Test Login</h1>
+    <form action="/test/test-login" method="POST">
+      <div>
+        <label>Email:</label><br>
+        <input type="email" name="email" placeholder="urim.aliu@gmail.com" required>
+      </div>
+      <div style="margin-top: 10px;">
+        <label>Password:</label><br>
+        <input type="password" name="password" required>
+      </div>
+      <button type="submit" style="margin-top: 10px;">Test Login</button>
+    </form>
+    <p><a href="/test/check-users">Back to User List</a></p>
+  `);
 });
 
 // Test: Create a sample call/absence to see on dashboard
