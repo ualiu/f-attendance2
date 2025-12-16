@@ -10,6 +10,11 @@ const path = require('path');
 
 const app = express();
 
+// Trust Railway proxy (for secure cookies and sessions)
+if (process.env.NODE_ENV === 'production') {
+  app.set('trust proxy', 1);
+}
+
 // Connect to MongoDB
 connectDB();
 
@@ -31,13 +36,17 @@ app.use(session({
   saveUninitialized: false,
   store: MongoStore.create({
     mongoUrl: process.env.MONGODB_URI,
-    touchAfter: 24 * 3600 // Lazy update session every 24 hours
+    touchAfter: 24 * 3600, // Lazy update session every 24 hours
+    ttl: 7 * 24 * 60 * 60 // 7 days
   }),
   cookie: {
     maxAge: 1000 * 60 * 60 * 24 * 7, // 7 days
     httpOnly: true,
-    secure: process.env.NODE_ENV === 'production' // HTTPS only in production
-  }
+    secure: process.env.NODE_ENV === 'production', // HTTPS only in production
+    sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
+    domain: process.env.COOKIE_DOMAIN || undefined
+  },
+  proxy: process.env.NODE_ENV === 'production' // Trust Railway proxy
 }));
 
 // Initialize Passport
