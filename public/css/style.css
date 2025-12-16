@@ -589,6 +589,57 @@ a:hover {
   color: white;
 }
 
+.badge-down {
+  background-color: #ff6b6b;
+  color: white;
+  animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.6; }
+}
+
+/* Toggle Switch */
+.toggle-switch {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  cursor: pointer;
+}
+
+.toggle-switch input {
+  position: relative;
+  width: 50px;
+  height: 24px;
+  appearance: none;
+  background: #ccc;
+  border-radius: 24px;
+  outline: none;
+  cursor: pointer;
+  transition: 0.3s;
+}
+
+.toggle-switch input:checked {
+  background: #28a745;
+}
+
+.toggle-switch input::before {
+  content: '';
+  position: absolute;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  top: 2px;
+  left: 2px;
+  background: white;
+  transition: 0.3s;
+}
+
+.toggle-switch input:checked::before {
+  left: 28px;
+}
+
 .station-details {
   font-size: 0.9rem;
   color: #666;
@@ -733,6 +784,11 @@ a:hover {
   border: 1px solid #e0e0e0;
   border-radius: 8px;
   padding: 1rem;
+}
+
+.station-card.station-down {
+  border: 3px solid #dc3545;
+  background-color: #fff5f5;
 }
 
 .station-card-header {

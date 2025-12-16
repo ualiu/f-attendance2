@@ -24,7 +24,7 @@ const employeeSchema = new mongoose.Schema({
   },
   shift: {
     type: String,
-    enum: ['Day (7am-3:30pm)', 'Afternoon (3:30pm-12am)', 'Night (12am-7am)'],
+    enum: ['Day', 'Night', 'Weekend'],
     required: true
   },
   supervisor_id: {

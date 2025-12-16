@@ -3,7 +3,8 @@
     "allow": [
       "Bash(npm install:*)",
       "Bash(dir:*)",
-      "Bash(npm run dev:*)"
+      "Bash(npm run dev:*)",
+      "Bash(node scripts/setup-vapi-assistant.js:*)"
     ],
     "deny": [],
     "ask": []

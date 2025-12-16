@@ -76,25 +76,51 @@
           <h3><%= line %></h3>
           <div class="station-grid">
             <% stationsByLine[line].forEach(station => { %>
-              <div class="station-card">
+              <div class="station-card <%= !station.is_operational ? 'station-down' : '' %>">
                 <div class="station-card-header">
                   <h4><%= station.name %></h4>
-                  <% if (station.required_for_production) { %>
-                    <span class="badge badge-critical">Critical</span>
-                  <% } %>
+                  <div>
+                    <% if (station.required_for_production) { %>
+                      <span class="badge badge-critical">Critical</span>
+                    <% } %>
+                    <% if (!station.is_operational) { %>
+                      <span class="badge badge-down">⚠️ DOWN</span>
+                    <% } %>
+                  </div>
                 </div>
                 <div class="station-card-body">
-                  <div class="station-info">
-                    <strong>Primary:</strong>
-                    <%= station.primary_worker ? station.primary_worker.name : 'Unassigned' %>
-                  </div>
-                  <div class="station-info">
-                    <strong>Backups:</strong>
-                    <% if (station.backup_workers.length > 0) { %>
-                      <%= station.backup_workers.map(w => w.name).join(', ') %>
-                    <% } else { %>
-                      <span class="text-warning">None</span>
+                  <!-- Operational Status -->
+                  <div class="station-info" style="margin-bottom: 1rem; padding: 0.5rem; background: <%= station.is_operational ? '#d4edda' : '#f8d7da' %>; border-radius: 4px;">
+                    <strong>Status:</strong>
+                    <label class="toggle-switch">
+                      <input type="checkbox" <%= station.is_operational ? 'checked' : '' %> onchange="toggleOperational('<%= station._id %>', this.checked)">
+                      <span class="toggle-slider"></span>
+                      <%= station.is_operational ? '✅ Operational' : '❌ Down' %>
+                    </label>
+                    <% if (!station.is_operational && station.last_status_change) { %>
+                      <br><small>Down since: <%= new Date(station.last_status_change).toLocaleString() %></small>
                     <% } %>
+                  </div>
+
+                  <!-- Day Shift -->
+                  <div class="station-info">
+                    <strong>☀️ Day Shift:</strong><br>
+                    Primary: <%= station.shifts?.day?.primary_worker?.name || 'Unassigned' %><br>
+                    Backups: <%= station.shifts?.day?.backup_workers?.map(w => w.name).join(', ') || 'None' %>
+                  </div>
+
+                  <!-- Night Shift -->
+                  <div class="station-info">
+                    <strong>🌙 Night Shift:</strong><br>
+                    Primary: <%= station.shifts?.night?.primary_worker?.name || 'Unassigned' %><br>
+                    Backups: <%= station.shifts?.night?.backup_workers?.map(w => w.name).join(', ') || 'None' %>
+                  </div>
+
+                  <!-- Weekend Shift -->
+                  <div class="station-info">
+                    <strong>📅 Weekend Shift:</strong><br>
+                    Primary: <%= station.shifts?.weekend?.primary_worker?.name || 'Unassigned' %><br>
+                    Backups: <%= station.shifts?.weekend?.backup_workers?.map(w => w.name).join(', ') || 'None' %>
                   </div>
                 </div>
                 <div class="station-card-actions">
@@ -144,9 +170,9 @@
         <div class="form-group">
           <label>Shift</label>
           <select name="shift" required>
-            <option value="Day (7am-3:30pm)">Day (7am-3:30pm)</option>
-            <option value="Afternoon (3:30pm-12am)">Afternoon (3:30pm-12am)</option>
-            <option value="Night (12am-7am)">Night (12am-7am)</option>
+            <option value="Day">Day</option>
+            <option value="Night">Night</option>
+            <option value="Weekend">Weekend</option>
           </select>
         </div>
         <div class="form-group">
@@ -195,9 +221,9 @@
         <div class="form-group">
           <label>Shift</label>
           <select name="shift" id="edit_shift" required>
-            <option value="Day (7am-3:30pm)">Day (7am-3:30pm)</option>
-            <option value="Afternoon (3:30pm-12am)">Afternoon (3:30pm-12am)</option>
-            <option value="Night (12am-7am)">Night (12am-7am)</option>
+            <option value="Day">Day</option>
+            <option value="Night">Night</option>
+            <option value="Weekend">Weekend</option>
           </select>
         </div>
         <div class="form-group">
@@ -251,6 +277,35 @@
     </div>
   </div>
 
+  <!-- Operational Status Modal -->
+  <div id="operationalModal" class="modal" style="display: none;">
+    <div class="modal-content" style="max-width: 500px;">
+      <h2 id="operationalModalTitle">Station Status Change</h2>
+      <form id="operationalForm" onsubmit="submitOperationalChange(event)">
+        <input type="hidden" id="operational_station_id">
+        <input type="hidden" id="operational_new_status">
+
+        <div class="form-group">
+          <label id="operationalReasonLabel">Reason</label>
+          <textarea
+            id="operational_reason"
+            name="reason"
+            rows="4"
+            placeholder="Enter reason..."
+            required
+            style="width: 100%; padding: 0.5rem; border: 1px solid #ddd; border-radius: 4px; resize: vertical;"
+          ></textarea>
+          <small style="color: #666;">This is required and will be logged for reporting.</small>
+        </div>
+
+        <div class="modal-actions">
+          <button type="submit" class="btn btn-primary">Confirm</button>
+          <button type="button" onclick="closeOperationalModal()" class="btn btn-secondary">Cancel</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
   <!-- Edit Station Modal -->
   <div id="editStationModal" class="modal" style="display: none;">
     <div class="modal-content" style="max-width: 600px;">
@@ -280,32 +335,73 @@
 
         <hr style="margin: 1.5rem 0; border: none; border-top: 1px solid #e0e0e0;">
 
+        <!-- Day Shift Assignments -->
+        <h3 style="margin-top: 1rem;">☀️ Day Shift</h3>
         <div class="form-group">
           <label>Primary Worker</label>
-          <select name="primary_worker" id="edit_station_primary">
+          <select name="day_primary" id="edit_day_primary">
             <option value="">Unassigned</option>
-            <% employees.forEach(emp => { %>
+            <% employees.filter(e => e.shift === 'Day').forEach(emp => { %>
               <option value="<%= emp._id %>"><%= emp.name %> (<%= emp.employee_id %>)</option>
             <% }); %>
           </select>
         </div>
-
         <div class="form-group">
           <label>Backup Workers</label>
-          <div style="border: 1px solid #ddd; border-radius: 4px; padding: 0.75rem; max-height: 200px; overflow-y: auto;">
-            <% employees.forEach(emp => { %>
+          <div style="border: 1px solid #ddd; border-radius: 4px; padding: 0.75rem; max-height: 150px; overflow-y: auto;">
+            <% employees.filter(e => e.shift === 'Day').forEach(emp => { %>
               <label style="display: block; margin-bottom: 0.5rem;">
-                <input type="checkbox" name="backup_workers" value="<%= emp._id %>" class="backup-checkbox">
+                <input type="checkbox" name="day_backups" value="<%= emp._id %>" class="day-backup-checkbox">
                 <%= emp.name %> (<%= emp.employee_id %>)
               </label>
             <% }); %>
-            <% if (employees.length === 0) { %>
-              <p style="color: #999; font-style: italic;">No employees available. Add employees first.</p>
-            <% } %>
           </div>
-          <small style="color: #666; display: block; margin-top: 0.5rem;">
-            Check all employees who can work at this station as backup
-          </small>
+        </div>
+
+        <!-- Night Shift Assignments -->
+        <h3 style="margin-top: 1rem;">🌙 Night Shift</h3>
+        <div class="form-group">
+          <label>Primary Worker</label>
+          <select name="night_primary" id="edit_night_primary">
+            <option value="">Unassigned</option>
+            <% employees.filter(e => e.shift === 'Night').forEach(emp => { %>
+              <option value="<%= emp._id %>"><%= emp.name %> (<%= emp.employee_id %>)</option>
+            <% }); %>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Backup Workers</label>
+          <div style="border: 1px solid #ddd; border-radius: 4px; padding: 0.75rem; max-height: 150px; overflow-y: auto;">
+            <% employees.filter(e => e.shift === 'Night').forEach(emp => { %>
+              <label style="display: block; margin-bottom: 0.5rem;">
+                <input type="checkbox" name="night_backups" value="<%= emp._id %>" class="night-backup-checkbox">
+                <%= emp.name %> (<%= emp.employee_id %>)
+              </label>
+            <% }); %>
+          </div>
+        </div>
+
+        <!-- Weekend Shift Assignments -->
+        <h3 style="margin-top: 1rem;">📅 Weekend Shift</h3>
+        <div class="form-group">
+          <label>Primary Worker</label>
+          <select name="weekend_primary" id="edit_weekend_primary">
+            <option value="">Unassigned</option>
+            <% employees.filter(e => e.shift === 'Weekend').forEach(emp => { %>
+              <option value="<%= emp._id %>"><%= emp.name %> (<%= emp.employee_id %>)</option>
+            <% }); %>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Backup Workers</label>
+          <div style="border: 1px solid #ddd; border-radius: 4px; padding: 0.75rem; max-height: 150px; overflow-y: auto;">
+            <% employees.filter(e => e.shift === 'Weekend').forEach(emp => { %>
+              <label style="display: block; margin-bottom: 0.5rem;">
+                <input type="checkbox" name="weekend_backups" value="<%= emp._id %>" class="weekend-backup-checkbox">
+                <%= emp.name %> (<%= emp.employee_id %>)
+              </label>
+            <% }); %>
+          </div>
         </div>
 
         <div class="modal-actions">
@@ -461,22 +557,95 @@
       document.getElementById('edit_station_department').value = station.department;
       document.getElementById('edit_station_critical').checked = station.required_for_production;
 
-      // Set primary worker
-      const primarySelect = document.getElementById('edit_station_primary');
-      primarySelect.value = station.primary_worker?._id || '';
+      // Set Day Shift
+      document.getElementById('edit_day_primary').value = station.shifts?.day?.primary_worker?._id || '';
+      document.querySelectorAll('.day-backup-checkbox').forEach(checkbox => {
+        checkbox.checked = station.shifts?.day?.backup_workers?.some(w => w._id === checkbox.value) || false;
+      });
 
-      // Set backup workers
-      const backupCheckboxes = document.querySelectorAll('.backup-checkbox');
-      backupCheckboxes.forEach(checkbox => {
-        checkbox.checked = false;
-        if (station.backup_workers) {
-          const isBackup = station.backup_workers.some(w => w._id === checkbox.value);
-          checkbox.checked = isBackup;
-        }
+      // Set Afternoon Shift
+      document.getElementById('edit_afternoon_primary').value = station.shifts?.afternoon?.primary_worker?._id || '';
+      document.querySelectorAll('.afternoon-backup-checkbox').forEach(checkbox => {
+        checkbox.checked = station.shifts?.afternoon?.backup_workers?.some(w => w._id === checkbox.value) || false;
+      });
+
+      // Set Night Shift
+      document.getElementById('edit_night_primary').value = station.shifts?.night?.primary_worker?._id || '';
+      document.querySelectorAll('.night-backup-checkbox').forEach(checkbox => {
+        checkbox.checked = station.shifts?.night?.backup_workers?.some(w => w._id === checkbox.value) || false;
+      });
+
+      // Set Weekend Shift
+      document.getElementById('edit_weekend_primary').value = station.shifts?.weekend?.primary_worker?._id || '';
+      document.querySelectorAll('.weekend-backup-checkbox').forEach(checkbox => {
+        checkbox.checked = station.shifts?.weekend?.backup_workers?.some(w => w._id === checkbox.value) || false;
       });
 
       // Show modal
       document.getElementById('editStationModal').style.display = 'flex';
+    }
+
+    function toggleOperational(stationId, isOperational) {
+      // Store the values
+      document.getElementById('operational_station_id').value = stationId;
+      document.getElementById('operational_new_status').value = isOperational;
+      document.getElementById('operational_reason').value = '';
+
+      // Update modal title and label based on status
+      const modal = document.getElementById('operationalModal');
+      const title = document.getElementById('operationalModalTitle');
+      const label = document.getElementById('operationalReasonLabel');
+      const textarea = document.getElementById('operational_reason');
+
+      if (!isOperational) {
+        // Going DOWN
+        title.textContent = '❌ Mark Station as DOWN';
+        label.textContent = 'Reason for Downtime';
+        textarea.placeholder = 'e.g., Machine broke, belt snapped, electrical issue...';
+        modal.style.backgroundColor = 'rgba(220, 53, 69, 0.1)';
+      } else {
+        // Coming back OPERATIONAL
+        title.textContent = '✅ Mark Station as OPERATIONAL';
+        label.textContent = 'Resolution Notes';
+        textarea.placeholder = 'e.g., Replaced belt, fixed wiring, reset machine...';
+        modal.style.backgroundColor = 'rgba(40, 167, 69, 0.1)';
+      }
+
+      // Show modal
+      modal.style.display = 'flex';
+    }
+
+    function closeOperationalModal() {
+      document.getElementById('operationalModal').style.display = 'none';
+      // Reload to revert toggle state
+      location.reload();
+    }
+
+    async function submitOperationalChange(e) {
+      e.preventDefault();
+
+      const stationId = document.getElementById('operational_station_id').value;
+      const isOperational = document.getElementById('operational_new_status').value === 'true';
+      const reason = document.getElementById('operational_reason').value.trim();
+
+      if (!reason) {
+        alert('Reason is required!');
+        return;
+      }
+
+      const response = await fetch(`/admin/stations/${stationId}/operational`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ is_operational: isOperational, reason })
+      });
+
+      if (response.ok) {
+        closeOperationalModal();
+        location.reload();
+      } else {
+        alert('Error updating station status');
+        closeOperationalModal();
+      }
     }
 
     async function updateStation(e) {
@@ -484,17 +653,41 @@
       const formData = new FormData(e.target);
       const stationId = formData.get('station_id');
 
-      // Get selected backup workers
-      const backupWorkers = [];
-      formData.getAll('backup_workers').forEach(id => {
-        if (id) backupWorkers.push(id);
+      // Get Day Shift workers
+      const dayBackups = [];
+      formData.getAll('day_backups').forEach(id => {
+        if (id) dayBackups.push(id);
+      });
+
+      // Get Night Shift workers
+      const nightBackups = [];
+      formData.getAll('night_backups').forEach(id => {
+        if (id) nightBackups.push(id);
+      });
+
+      // Get Weekend Shift workers
+      const weekendBackups = [];
+      formData.getAll('weekend_backups').forEach(id => {
+        if (id) weekendBackups.push(id);
       });
 
       const data = {
         department: formData.get('department'),
         critical: formData.has('critical'),
-        primary_worker: formData.get('primary_worker') || null,
-        backup_workers: backupWorkers
+        shifts: {
+          day: {
+            primary_worker: formData.get('day_primary') || null,
+            backup_workers: dayBackups
+          },
+          night: {
+            primary_worker: formData.get('night_primary') || null,
+            backup_workers: nightBackups
+          },
+          weekend: {
+            primary_worker: formData.get('weekend_primary') || null,
+            backup_workers: weekendBackups
+          }
+        }
       };
 
       const response = await fetch(`/admin/stations/${stationId}`, {
@@ -525,7 +718,12 @@
     // Close modals when clicking outside
     window.onclick = function(event) {
       if (event.target.classList.contains('modal')) {
-        event.target.style.display = 'none';
+        // For operational modal, reload to revert toggle
+        if (event.target.id === 'operationalModal') {
+          closeOperationalModal();
+        } else {
+          event.target.style.display = 'none';
+        }
       }
     }
   </script>

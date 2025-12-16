@@ -15,6 +15,80 @@ const workStationSchema = new mongoose.Schema({
     required: true
   },
 
+  // Shift-based assignments
+  shifts: {
+    day: {
+      primary_worker: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Employee',
+        default: null
+      },
+      backup_workers: [{
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Employee'
+      }]
+    },
+    night: {
+      primary_worker: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Employee',
+        default: null
+      },
+      backup_workers: [{
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Employee'
+      }]
+    },
+    weekend: {
+      primary_worker: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Employee',
+        default: null
+      },
+      backup_workers: [{
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Employee'
+      }]
+    }
+  },
+
+  // Operational status tracking
+  is_operational: {
+    type: Boolean,
+    default: true
+  },
+  last_status_change: {
+    type: Date,
+    default: Date.now
+  },
+  downtime_history: [{
+    went_down_at: {
+      type: Date,
+      required: true
+    },
+    came_back_up_at: {
+      type: Date,
+      default: null
+    },
+    duration_minutes: {
+      type: Number,
+      default: 0
+    },
+    reason: {
+      type: String,
+      default: ''
+    },
+    resolution_notes: {
+      type: String,
+      default: ''
+    }
+  }],
+  total_downtime_minutes: {
+    type: Number,
+    default: 0
+  },
+
+  // Legacy fields (for backward compatibility - can be removed later)
   primary_worker: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Employee',

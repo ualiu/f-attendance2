@@ -248,6 +248,63 @@ exports.createAssistantConfig = () => {
   };
 };
 
+// Update assistant via VAPI API
+exports.updateAssistant = async (assistantId, updates) => {
+  const VAPI_API_KEY = process.env.VAPI_API_KEY;
+
+  if (!VAPI_API_KEY) {
+    throw new Error('VAPI_API_KEY not set in environment variables');
+  }
+
+  try {
+    const response = await fetch(`https://api.vapi.ai/assistant/${assistantId}`, {
+      method: 'PATCH',
+      headers: {
+        'Authorization': `Bearer ${VAPI_API_KEY}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(updates)
+    });
+
+    if (!response.ok) {
+      throw new Error(`VAPI API error: ${response.statusText}`);
+    }
+
+    return await response.json();
+  } catch (error) {
+    console.error('Error updating VAPI assistant:', error);
+    throw error;
+  }
+};
+
+// Example: Update system prompt based on business rules
+exports.updateAttendancePolicy = async (assistantId, newPolicy) => {
+  const newPrompt = `You are an AI attendance assistant for Felton Brushes manufacturing.
+
+COMPANY POLICY (UPDATED):
+${newPolicy}
+
+YOUR JOB:
+1. Greet employee warmly by name
+2. Confirm their work station
+3. Ask reason for calling (sick/late)
+4. Capture details (reason, expected return)
+5. Tell them their current points status
+6. If at 4-5 points: Proactively offer help/coaching
+7. If at 6+ points: Inform formal review required
+8. Always be supportive, non-judgmental
+
+TONE: Professional, supportive, clear about policies
+
+IMPORTANT: You must call the appropriate function to log the absence or tardy.`;
+
+  return await exports.updateAssistant(assistantId, {
+    model: {
+      systemPrompt: newPrompt
+    }
+  });
+};
+
 // Start a Vapi call
 exports.startCall = async (phoneNumber, employeeContext = null) => {
   // In production, this would call the Vapi API to initiate a call

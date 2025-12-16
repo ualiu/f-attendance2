@@ -68,16 +68,20 @@ router.post('/stations', async (req, res) => {
 // Update work station
 router.put('/stations/:id', async (req, res) => {
   try {
-    const { line, stationName, department, critical, primary_worker, backup_workers } = req.body;
-
-    // Get the current station to see if primary worker changed
-    const currentStation = await WorkStation.findById(req.params.id);
+    const { line, stationName, department, critical, primary_worker, backup_workers, shifts } = req.body;
 
     const updates = {};
     if (line && stationName) updates.name = `${line} - ${stationName}`;
     if (line) updates.line = line;
     if (department) updates.department = department;
     if (critical !== undefined) updates.required_for_production = critical;
+
+    // Handle shift-based assignments
+    if (shifts) {
+      updates.shifts = shifts;
+    }
+
+    // Legacy support for old primary_worker/backup_workers format
     if (primary_worker !== undefined) updates.primary_worker = primary_worker || null;
     if (backup_workers !== undefined) updates.backup_workers = backup_workers;
 
@@ -86,24 +90,64 @@ router.put('/stations/:id', async (req, res) => {
       req.params.id,
       updates,
       { new: true }
-    ).populate('primary_worker backup_workers');
+    ).populate([
+      'shifts.day.primary_worker',
+      'shifts.day.backup_workers',
+      'shifts.afternoon.primary_worker',
+      'shifts.afternoon.backup_workers',
+      'shifts.night.primary_worker',
+      'shifts.night.backup_workers'
+    ]);
 
-    // Update employee work_station field if primary worker changed
-    if (primary_worker !== undefined) {
-      // Remove old primary worker's assignment
-      if (currentStation.primary_worker && currentStation.primary_worker.toString() !== primary_worker) {
-        await Employee.findByIdAndUpdate(currentStation.primary_worker, {
-          work_station: null
-        });
-      }
+    res.json({ success: true, station });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
 
-      // Assign new primary worker
-      if (primary_worker) {
-        await Employee.findByIdAndUpdate(primary_worker, {
-          work_station: station.name
-        });
+// Toggle station operational status
+router.put('/stations/:id/operational', async (req, res) => {
+  try {
+    const { is_operational, reason } = req.body;
+    const station = await WorkStation.findById(req.params.id);
+
+    if (!station) {
+      return res.status(404).json({ success: false, error: 'Station not found' });
+    }
+
+    const now = new Date();
+    const wasOperational = station.is_operational;
+
+    // If going from operational to down
+    if (wasOperational && !is_operational) {
+      station.downtime_history.push({
+        went_down_at: now,
+        came_back_up_at: null,
+        duration_minutes: 0,
+        reason: reason || 'Not specified'
+      });
+    }
+
+    // If going from down to operational
+    if (!wasOperational && is_operational) {
+      // Find the most recent downtime entry
+      const lastDowntime = station.downtime_history[station.downtime_history.length - 1];
+      if (lastDowntime && !lastDowntime.came_back_up_at) {
+        lastDowntime.came_back_up_at = now;
+        const durationMs = now - lastDowntime.went_down_at;
+        lastDowntime.duration_minutes = Math.floor(durationMs / 60000);
+        station.total_downtime_minutes += lastDowntime.duration_minutes;
+
+        // Add resolution notes
+        if (reason) {
+          lastDowntime.resolution_notes = reason;
+        }
       }
     }
+
+    station.is_operational = is_operational;
+    station.last_status_change = now;
+    await station.save();
 
     res.json({ success: true, station });
   } catch (error) {
