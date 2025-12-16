@@ -144,4 +144,34 @@ router.post('/create-admin', async (req, res) => {
   }
 });
 
+// Set password for existing account (for Google accounts that want password login)
+router.get('/set-password', async (req, res) => {
+  res.render('auth/set-password');
+});
+
+router.post('/set-password', async (req, res) => {
+  try {
+    const { email, password } = req.body;
+
+    const supervisor = await Supervisor.findOne({ email });
+
+    if (!supervisor) {
+      return res.status(404).send('Account not found. Please check your email.');
+    }
+
+    // Hash and set password
+    supervisor.password_hash = await Supervisor.hashPassword(password);
+    await supervisor.save();
+
+    res.send(`
+      <h1>✅ Password Set Successfully!</h1>
+      <p>You can now login with email and password.</p>
+      <p><a href="/login">Go to Login</a></p>
+    `);
+  } catch (error) {
+    console.error('Error setting password:', error);
+    res.status(500).send('Server error');
+  }
+});
+
 module.exports = router;

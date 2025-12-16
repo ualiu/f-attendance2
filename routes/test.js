@@ -128,6 +128,40 @@ router.get('/test-stations', async (req, res) => {
   }
 });
 
+// Test: Check if any supervisors exist
+router.get('/check-users', async (req, res) => {
+  try {
+    const Supervisor = require('../models/Supervisor');
+    const supervisors = await Supervisor.find({});
+
+    res.send(`
+      <h1>👥 User Check</h1>
+      <p><strong>Total Supervisors:</strong> ${supervisors.length}</p>
+      <hr>
+      ${supervisors.length === 0 ? `
+        <p style="color: red;">❌ No users found!</p>
+        <p><a href="/create-admin">Create Admin Account</a></p>
+      ` : `
+        <h3>Users:</h3>
+        <ul>
+          ${supervisors.map(s => `
+            <li>
+              <strong>${s.name}</strong> (${s.email})<br>
+              Role: ${s.role}<br>
+              Has password: ${s.password_hash ? 'Yes ✅' : 'No ❌ (Google only)'}<br>
+              Active: ${s.is_active ? 'Yes' : 'No'}
+            </li>
+          `).join('')}
+        </ul>
+      `}
+      <hr>
+      <p><a href="/login">Go to Login</a></p>
+    `);
+  } catch (error) {
+    res.status(500).send(`Error: ${error.message}`);
+  }
+});
+
 // Test: Create a sample call/absence to see on dashboard
 router.get('/create-test-call', async (req, res) => {
   try {
