@@ -49,10 +49,12 @@ router.post('/incoming', async (req, res) => {
 
     if (!parsedData.success) {
       console.log('   ❌ Failed to parse message:', parsedData.error);
+      console.log('   📋 Full parsed data:', JSON.stringify(parsedData, null, 2));
 
       const twiml = new twilio.twiml.MessagingResponse();
 
       if (parsedData.needs_reason) {
+        console.log('   💬 Sending follow-up request for more details...');
         // Type is identified, but needs more details
         if (parsedData.type === 'sick') {
           twiml.message(`Hi ${employee.name}, got it - you can't come in due to illness.
@@ -107,7 +109,9 @@ Examples:
 
 Please reply with the reason.`);
         }
+        console.log('   📤 Follow-up message prepared, sending TwiML response...');
       } else if (parsedData.needs_clarification) {
+        console.log('   💬 Sending clarification request...');
         twiml.message(`Hi ${employee.name}, I need more info about your absence.
 
 Please choose one and provide details:
@@ -125,7 +129,9 @@ Reply: "Personal - [reason]"
 Example: "Personal - family emergency"
 
 Please reply with one of the formats above.`);
+        console.log('   📤 Clarification message prepared, sending TwiML response...');
       } else {
+        console.log('   💬 Sending generic help message...');
         twiml.message(`Hi ${employee.name}, I couldn't understand your message.
 
 Please use one of these formats:
@@ -137,10 +143,13 @@ Please use one of these formats:
 📅 PERSONAL: "Personal day - appointment" or "Family emergency"
 
 Reply with more details so I can log your absence correctly.`);
+        console.log('   📤 Generic help message prepared, sending TwiML response...');
       }
 
+      const twimlString = twiml.toString();
+      console.log('   📤 Final TwiML:', twimlString);
       res.type('text/xml');
-      return res.send(twiml.toString());
+      return res.send(twimlString);
     }
 
     // Create absence record
