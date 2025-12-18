@@ -95,9 +95,9 @@
       </div>
     <% } %>
 
-    <!-- Recent Calls -->
+    <!-- Recent Reports -->
     <div class="recent-calls-section">
-      <h2>Recent Calls</h2>
+      <h2>Recent Reports (SMS & Calls)</h2>
       <table class="calls-table">
         <thead>
           <tr>
@@ -113,7 +113,7 @@
         <tbody>
           <% if (recentCalls.length === 0) { %>
             <tr>
-              <td colspan="7" class="no-data">No recent calls</td>
+              <td colspan="7" class="no-data">No recent reports</td>
             </tr>
           <% } else { %>
             <% recentCalls.forEach(call => { %>
@@ -130,7 +130,7 @@
                 <td><%= call.points_awarded %></td>
                 <td>
                   <% if (call.call_transcript) { %>
-                    <button onclick="viewTranscript('<%= call._id %>')" class="btn-small">Transcript</button>
+                    <button onclick="viewTranscript('<%= call._id %>')" class="btn-small">View</button>
                   <% } %>
                   <% if (call.call_recording_url) { %>
                     <a href="<%= call.call_recording_url %>" target="_blank" class="btn-small">Recording</a>

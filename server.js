@@ -75,10 +75,10 @@ app.use((req, res, next) => {
 // Routes
 app.use('/', require('./routes/auth'));
 app.use('/admin', require('./routes/setup'));
-app.use('/admin/vapi', require('./routes/admin-vapi'));
 app.use('/dashboard', require('./routes/dashboard'));
 app.use('/api/employees', require('./routes/employees'));
 app.use('/api/calls', require('./routes/calls'));
+app.use('/api/sms', require('./routes/sms'));
 app.use('/reports', require('./routes/reports'));
 app.use('/test', require('./routes/test'));
 
