@@ -51,7 +51,12 @@ router.post('/incoming', async (req, res) => {
       console.log('   ❌ Failed to parse message:', parsedData.error);
 
       const twiml = new twilio.twiml.MessagingResponse();
-      twiml.message(`Hi ${employee.name}, I didn't quite understand that. Please text: "Sick today" or "Running late 30 minutes" or "Taking personal day"`);
+
+      if (parsedData.needs_clarification) {
+        twiml.message(`Hi ${employee.name}, I need a bit more info. Are you:\n1. Sick/Not feeling well\n2. Running late (how many minutes?)\n3. Taking a personal day\n\nPlease reply with more details.`);
+      } else {
+        twiml.message(`Hi ${employee.name}, I couldn't process that. Please text something like: "Sick today", "30 min late - traffic", or "Personal day"`);
+      }
 
       res.type('text/xml');
       return res.send(twiml.toString());

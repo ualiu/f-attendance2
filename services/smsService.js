@@ -19,28 +19,39 @@ Shift: ${employee.shift}
 Parse this attendance message and extract structured data:
 "${messageBody}"
 
+Be SMART about interpreting natural language:
+- "Can't come in" / "Won't be in" / "Not coming" → Assume SICK unless they specify otherwise
+- "Running late" / "Gonna be late" → Type is LATE
+- "Personal day" / "Need the day off" → Type is PERSONAL
+- If they don't give a reason, infer one from context
+
 Determine:
-1. Type: "sick", "late", or "personal"
-2. Reason: Brief description
+1. Type: "sick", "late", "personal", or "unclear"
+2. Reason: Brief description (infer if not explicitly stated)
 3. Expected return: If they mention when they'll be back (format: YYYY-MM-DD, or null)
 4. Minutes late: If type is "late", how many minutes (number, or null)
+5. Needs clarification: true if message is too vague to determine type
 
 Examples:
-- "I'm sick today" → type: sick, reason: "Feeling sick"
-- "Running 30 min late, traffic" → type: late, minutes_late: 30, reason: "Traffic"
-- "Taking a personal day" → type: personal, reason: "Personal day"
-- "Sick, hope to be back tomorrow" → type: sick, expected_return: tomorrow's date
+- "I'm sick today" → type: sick, reason: "Feeling sick", needs_clarification: false
+- "Can't come in today" → type: sick, reason: "Unable to come in", needs_clarification: false
+- "Not feeling well" → type: sick, reason: "Not feeling well", needs_clarification: false
+- "Running 30 min late, traffic" → type: late, minutes_late: 30, reason: "Traffic", needs_clarification: false
+- "Taking a personal day" → type: personal, reason: "Personal day", needs_clarification: false
+- "Won't be there" → type: sick, reason: "Absent", needs_clarification: false
+- "Hey" → type: unclear, needs_clarification: true
 
 Respond ONLY with valid JSON:
 {
-  "type": "sick|late|personal",
+  "type": "sick|late|personal|unclear",
   "reason": "string",
   "expected_return": "YYYY-MM-DD or null",
-  "minutes_late": number or null
+  "minutes_late": number or null,
+  "needs_clarification": boolean
 }`;
 
     const message = await anthropic.messages.create({
-      model: 'claude-3-5-sonnet-20241022',
+      model: 'claude-opus-4-5-20251101',
       max_tokens: 500,
       messages: [{
         role: 'user',
@@ -54,10 +65,20 @@ Respond ONLY with valid JSON:
     // Parse JSON response
     const parsed = JSON.parse(responseText);
 
+    // Check if needs clarification
+    if (parsed.needs_clarification || parsed.type === 'unclear') {
+      return {
+        success: false,
+        needs_clarification: true,
+        error: 'Message too vague'
+      };
+    }
+
     // Validate
     if (!parsed.type || !['sick', 'late', 'personal'].includes(parsed.type)) {
       return {
         success: false,
+        needs_clarification: true,
         error: 'Invalid type'
       };
     }
