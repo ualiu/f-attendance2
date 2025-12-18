@@ -119,7 +119,7 @@ const assistantConfig = {
   },
   model: {
     provider: 'openai',
-    model: 'gpt-4-turbo',
+    model: 'gpt-4o',
     temperature: 0.5, // Balanced for natural conversation
     maxTokens: 250, // Allow for complete sentences
     messages: [
@@ -140,9 +140,11 @@ const assistantConfig = {
   maxDurationSeconds: 300, // Max 5 minute calls
   recordingEnabled: true,
 
-  // Function server URL
-  serverUrl: `${SERVER_URL}/api/calls/vapi-function`,
-  serverUrlSecret: process.env.VAPI_SERVER_SECRET || 'felton-vapi-secret',
+  // Server configuration for function calling
+  server: {
+    url: `${SERVER_URL}/api/calls/vapi-function`,
+    secret: process.env.VAPI_SERVER_SECRET || 'felton-vapi-secret'
+  },
 
   // Function definitions
   functions: [

@@ -26,6 +26,14 @@ app.set('views', path.join(__dirname, 'views'));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
+// Log ALL incoming requests to /api/calls/*
+app.use('/api/calls', (req, res, next) => {
+  console.log(`\n📥 INCOMING REQUEST TO ${req.method} ${req.path}`);
+  console.log(`   Headers:`, req.headers);
+  console.log(`   Body:`, req.body);
+  next();
+});
+
 // Static files
 app.use(express.static(path.join(__dirname, 'public')));
 

@@ -126,10 +126,18 @@ exports.vapiFunction = {
         station_impacted: stationImpact.impacted
       });
 
+      console.log(`✅ ABSENCE SAVED TO DATABASE:`);
+      console.log(`   ID: ${absence._id}`);
+      console.log(`   Employee: ${employee.name} (${employee._id})`);
+      console.log(`   Type: ${type}`);
+      console.log(`   Reason: ${reason}`);
+      console.log(`   Call Time: ${callTime}`);
+      console.log(`   Points: ${pointsAwarded}`);
+
       // Update employee stats
       await attendanceService.updateEmployeeStats(employee._id);
 
-      console.log(`✅ Absence logged for ${employee.name}: ${type} - ${reason}`);
+      console.log(`✅ Employee stats updated for ${employee.name}`);
 
       return {
         success: true,
@@ -181,9 +189,15 @@ exports.vapiFunction = {
         late_notice: noticeCheck.isLateNotice
       });
 
+      console.log(`✅ TARDY SAVED TO DATABASE:`);
+      console.log(`   ID: ${absence._id}`);
+      console.log(`   Employee: ${employee.name} (${employee._id})`);
+      console.log(`   Minutes Late: ${minutes_late}`);
+      console.log(`   Call Time: ${callTime}`);
+
       await attendanceService.updateEmployeeStats(employee._id);
 
-      console.log(`✅ Tardy logged for ${employee.name}: ${minutes_late} minutes late`);
+      console.log(`✅ Employee stats updated for ${employee.name}`);
 
       return {
         success: true,

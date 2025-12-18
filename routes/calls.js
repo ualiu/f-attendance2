@@ -46,28 +46,45 @@ router.post('/incoming', async (req, res) => {
 // Vapi function call handler (called during conversation)
 router.post('/vapi-function', async (req, res) => {
   try {
-    const { functionName, parameters } = req.body;
-
+    // Log the entire request for debugging
     console.log(`\n🔔 VAPI function call received:`);
-    console.log(`   Function: ${functionName}`);
-    console.log(`   Parameters:`, JSON.stringify(parameters, null, 2));
+    console.log(`   Headers:`, JSON.stringify(req.headers, null, 2));
+    console.log(`   Body:`, JSON.stringify(req.body, null, 2));
+
+    // VAPI may send different formats, let's handle both
+    const functionName = req.body.functionName || req.body.function?.name || req.body.name;
+    const parameters = req.body.parameters || req.body.function?.parameters || req.body.arguments;
+
+    console.log(`   Extracted Function: ${functionName}`);
+    console.log(`   Extracted Parameters:`, JSON.stringify(parameters, null, 2));
+
+    if (!functionName) {
+      console.log('   ❌ No function name found in request');
+      return res.status(400).json({
+        success: false,
+        error: 'No function name provided'
+      });
+    }
 
     // Execute the appropriate function from vapiService
     if (vapiService.vapiFunction[functionName]) {
       const result = await vapiService.vapiFunction[functionName](parameters);
 
-      console.log(`   Result:`, JSON.stringify(result, null, 2));
+      console.log(`   ✅ Result:`, JSON.stringify(result, null, 2));
 
       return res.json(result);
     }
 
     console.log(`   ❌ Function ${functionName} not found`);
+    console.log(`   Available functions:`, Object.keys(vapiService.vapiFunction));
+
     return res.status(404).json({
       success: false,
       error: `Function ${functionName} not found`
     });
   } catch (error) {
     console.error('❌ Error executing VAPI function:', error);
+    console.error('Stack:', error.stack);
     res.status(500).json({
       success: false,
       error: error.message
@@ -80,7 +97,8 @@ router.post('/vapi-webhook', async (req, res) => {
   try {
     const callData = req.body;
 
-    console.log('Vapi webhook received:', JSON.stringify(callData, null, 2));
+    console.log('\n📞 Vapi webhook received (call ended):');
+    console.log('   Full payload:', JSON.stringify(callData, null, 2));
 
     // Extract data from Vapi webhook
     const {
@@ -203,6 +221,47 @@ router.get('/:id', async (req, res) => {
     res.json({ success: true, absence });
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Test endpoint to verify VAPI integration
+router.get('/test/vapi-integration', async (req, res) => {
+  try {
+    const Employee = require('../models/Employee');
+    const Absence = require('../models/Absence');
+
+    // Check database connectivity
+    const employeeCount = await Employee.countDocuments();
+    const absenceCount = await Absence.countDocuments();
+
+    // Check if VAPI functions are available
+    const availableFunctions = Object.keys(vapiService.vapiFunction);
+
+    res.json({
+      success: true,
+      status: 'VAPI integration is configured',
+      database: {
+        connected: true,
+        employees: employeeCount,
+        absences: absenceCount
+      },
+      vapi: {
+        serverUrl: `${req.protocol}://${req.get('host')}/api/calls/vapi-function`,
+        availableFunctions,
+        functionsCount: availableFunctions.length
+      },
+      instructions: {
+        message: 'Configure this URL in VAPI dashboard as your Server URL',
+        serverUrl: `${req.protocol}://${req.get('host')}/api/calls/vapi-function`,
+        webhookUrl: `${req.protocol}://${req.get('host')}/api/calls/vapi-webhook`
+      }
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: error.message,
+      message: 'VAPI integration test failed'
+    });
   }
 });
 
