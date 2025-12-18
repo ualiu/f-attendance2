@@ -63,8 +63,12 @@ Respond ONLY with valid JSON:
     });
 
     console.log('   ✅ Claude API responded');
-    const responseText = message.content[0].text;
+    let responseText = message.content[0].text;
     console.log('   🤖 Claude response:', responseText);
+
+    // Strip markdown code blocks if present
+    responseText = responseText.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+    console.log('   📋 Cleaned response:', responseText);
 
     // Parse JSON response
     const parsed = JSON.parse(responseText);
