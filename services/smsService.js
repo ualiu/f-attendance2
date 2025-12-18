@@ -50,6 +50,9 @@ Respond ONLY with valid JSON:
   "needs_clarification": boolean
 }`;
 
+    console.log('   🔄 Calling Claude API...');
+    console.log('   📝 Message to parse:', messageBody);
+
     const message = await anthropic.messages.create({
       model: 'claude-opus-4-5-20251101',
       max_tokens: 500,
@@ -59,6 +62,7 @@ Respond ONLY with valid JSON:
       }]
     });
 
+    console.log('   ✅ Claude API responded');
     const responseText = message.content[0].text;
     console.log('   🤖 Claude response:', responseText);
 
@@ -92,7 +96,9 @@ Respond ONLY with valid JSON:
     };
 
   } catch (error) {
-    console.error('Error parsing message with Claude:', error);
+    console.error('❌ Error parsing message with Claude:', error);
+    console.error('   Error details:', error.message);
+    console.error('   Stack:', error.stack);
     return {
       success: false,
       error: error.message
