@@ -8,7 +8,8 @@
       "Bash(mongo:*)",
       "Bash(mongosh --version:*)",
       "Bash(node scripts/check-absences.js:*)",
-      "Bash(node scripts/verify-vapi-config.js:*)"
+      "Bash(node scripts/verify-vapi-config.js:*)",
+      "Bash(node -e:*)"
     ],
     "deny": [],
     "ask": []

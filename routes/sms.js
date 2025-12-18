@@ -15,10 +15,20 @@ router.post('/incoming', async (req, res) => {
     const { From: phoneNumber, Body: messageBody } = req.body;
 
     // Look up employee by phone number
-    const normalizedPhone = phoneNumber.replace(/[\s\-\(\)\+]/g, '');
+    // Normalize: remove all non-digits
+    const normalizedPhone = phoneNumber.replace(/\D/g, '');
+    console.log('   Original phone:', phoneNumber);
+    console.log('   Normalized phone:', normalizedPhone);
+
+    // Try to find employee - search for the last 10 digits
+    const last10Digits = normalizedPhone.slice(-10);
+    console.log('   Searching for last 10 digits:', last10Digits);
+
     const employee = await Employee.findOne({
-      phone: { $regex: normalizedPhone }
+      phone: { $regex: last10Digits }
     });
+
+    console.log('   Employee search result:', employee ? `Found: ${employee.name}` : 'Not found');
 
     if (!employee) {
       console.log('   ❌ Employee not found for phone:', phoneNumber);
