@@ -57,92 +57,24 @@ router.post('/incoming', async (req, res) => {
         console.log('   💬 Sending follow-up request for more details...');
         // Type is identified, but needs more details
         if (parsedData.type === 'sick') {
-          twiml.message(`Hi ${employee.name}, got it - you can't come in due to illness.
-
-What's the specific reason?
-
-Examples:
-• "Flu"
-• "Fever and headache"
-• "Stomach bug"
-• "Doctor appointment"
-• "COVID symptoms"
-
-Please reply with the specific reason.`);
+          twiml.message(`Hi ${employee.name}, got it. What's the specific reason? (e.g., flu, fever, doctor appt)`);
         } else if (parsedData.type === 'late') {
           if (parsedData.missing_minutes) {
-            twiml.message(`Hi ${employee.name}, got it - you're running late.
-
-How many minutes late AND what's the reason?
-
-Examples:
-• "30 min - traffic"
-• "15 minutes - car trouble"
-• "20 min - overslept"
-• "1 hour - bus delayed"
-
-Please reply with minutes and reason.`);
+            twiml.message(`Hi ${employee.name}, how many minutes late and why? (e.g., "30 min - traffic")`);
           } else {
-            twiml.message(`Hi ${employee.name}, got it - you're running late.
-
-What's the specific reason?
-
-Examples:
-• "Traffic jam"
-• "Car won't start"
-• "Overslept"
-• "Train delayed"
-
-Please reply with the reason.`);
+            twiml.message(`Hi ${employee.name}, what's the reason you're late? (e.g., traffic, car trouble)`);
           }
         } else if (parsedData.type === 'personal') {
-          twiml.message(`Hi ${employee.name}, got it - you need a personal day.
-
-What's the specific reason?
-
-Examples:
-• "Family emergency"
-• "Child care issue"
-• "Court appearance"
-• "Car in shop"
-• "Appointment"
-
-Please reply with the reason.`);
+          twiml.message(`Hi ${employee.name}, what's the reason for personal day? (e.g., family emergency, appt)`);
         }
         console.log('   📤 Follow-up message prepared, sending TwiML response...');
       } else if (parsedData.needs_clarification) {
         console.log('   💬 Sending clarification request...');
-        twiml.message(`Hi ${employee.name}, I need more info about your absence.
-
-Please choose one and provide details:
-
-🤒 SICK
-Reply: "Sick - [reason]"
-Example: "Sick - flu"
-
-⏰ LATE
-Reply: "Late - [minutes] - [reason]"
-Example: "Late - 30 min - traffic"
-
-📅 PERSONAL DAY
-Reply: "Personal - [reason]"
-Example: "Personal - family emergency"
-
-Please reply with one of the formats above.`);
+        twiml.message(`Hi ${employee.name}, please clarify: Are you sick, running late (how many min?), or taking a personal day?`);
         console.log('   📤 Clarification message prepared, sending TwiML response...');
       } else {
         console.log('   💬 Sending generic help message...');
-        twiml.message(`Hi ${employee.name}, I couldn't understand your message.
-
-Please use one of these formats:
-
-🤒 SICK: "Sick - flu" or "Not feeling well - fever"
-
-⏰ LATE: "30 min late - traffic" or "Running late - 15 min - overslept"
-
-📅 PERSONAL: "Personal day - appointment" or "Family emergency"
-
-Reply with more details so I can log your absence correctly.`);
+        twiml.message(`Hi ${employee.name}, please text: "Sick - [reason]", "30 min late - [reason]", or "Personal - [reason]"`);
         console.log('   📤 Generic help message prepared, sending TwiML response...');
       }
 
