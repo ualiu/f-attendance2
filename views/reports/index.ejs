@@ -110,6 +110,23 @@
   </main>
 
   <script>
+    // Toggle sidebar for mobile
+    function toggleSidebar() {
+      const sidebar = document.querySelector('.sidebar');
+      const overlay = document.querySelector('.sidebar-overlay');
+      sidebar.classList.toggle('active');
+      overlay.classList.toggle('active');
+    }
+
+    // Close sidebar when clicking on a link (mobile only)
+    document.querySelectorAll('.sidebar-link').forEach(link => {
+      link.addEventListener('click', () => {
+        if (window.innerWidth < 768) {
+          toggleSidebar();
+        }
+      });
+    });
+
     function setQuarterDates() {
       const now = new Date();
       const month = now.getMonth();

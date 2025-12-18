@@ -139,16 +139,26 @@
         </tbody>
       </table>
     </div>
-
-    <!-- Quick Actions -->
-    <div class="quick-actions">
-      <h3>Quick Actions</h3>
-      <a href="/reports" class="btn btn-primary">Generate Report</a>
-      <a href="/dashboard/stations" class="btn btn-secondary">View All Stations</a>
-      <a href="/admin/manage" class="btn btn-secondary">Manage Employees</a>
-    </div>
   </main>
 
   <script src="/js/dashboard.js"></script>
+  <script>
+    // Toggle sidebar for mobile
+    function toggleSidebar() {
+      const sidebar = document.querySelector('.sidebar');
+      const overlay = document.querySelector('.sidebar-overlay');
+      sidebar.classList.toggle('active');
+      overlay.classList.toggle('active');
+    }
+
+    // Close sidebar when clicking on a link (mobile only)
+    document.querySelectorAll('.sidebar-link').forEach(link => {
+      link.addEventListener('click', () => {
+        if (window.innerWidth < 768) {
+          toggleSidebar();
+        }
+      });
+    });
+  </script>
 </body>
 </html>
