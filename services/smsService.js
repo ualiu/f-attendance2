@@ -6,10 +6,38 @@ const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY,
 });
 
+// Track recent conversations to avoid greeting on every message
+// Key: phone number, Value: timestamp of last message
+const recentConversations = new Map();
+
+// Check if this is a continuation of a recent conversation (within 10 minutes)
+exports.isFollowUpMessage = (phoneNumber) => {
+  const lastMessageTime = recentConversations.get(phoneNumber);
+  if (!lastMessageTime) return false;
+
+  const tenMinutesAgo = Date.now() - (10 * 60 * 1000); // 10 minutes
+  const isFollowUp = lastMessageTime > tenMinutesAgo;
+
+  return isFollowUp;
+};
+
+// Mark that we received a message from this number
+exports.markConversationActive = (phoneNumber) => {
+  recentConversations.set(phoneNumber, Date.now());
+
+  // Clean up old entries (over 15 minutes old) to prevent memory bloat
+  const fifteenMinutesAgo = Date.now() - (15 * 60 * 1000);
+  for (const [phone, timestamp] of recentConversations.entries()) {
+    if (timestamp < fifteenMinutesAgo) {
+      recentConversations.delete(phone);
+    }
+  }
+};
+
 // Parse attendance message using Claude
 exports.parseAttendanceMessage = async (messageBody, employee) => {
   try {
-    const prompt = `You are an expert attendance message parser for Felton Brushes manufacturing company. Your job is to accurately classify employee attendance messages and extract specific details.
+    const prompt = `You are an attendance assistant for Felton Brushes manufacturing. Parse employee messages naturally and extract key information. Be EXTREMELY flexible and forgiving - employees text quickly and informally.
 
 Employee: ${employee.name}
 Current Points: ${employee.points_current_quarter}
@@ -19,174 +47,282 @@ Shift: ${employee.shift}
 MESSAGE TO PARSE:
 "${messageBody}"
 
-CLASSIFICATION RULES (READ CAREFULLY):
-
 ═══════════════════════════════════════════════════════════════════
-TYPE: **LATE** - Employee IS coming to work, just delayed/tardy
+CRITICAL: BE EXTREMELY FLEXIBLE AND FORGIVING
 ═══════════════════════════════════════════════════════════════════
 
-Keywords that ALWAYS mean LATE:
-• "late" / "delayed" / "tardy" / "behind schedule"
-• "running late" / "gonna be late" / "will be late" / "I'll be late"
-• "stuck in traffic" / "traffic delay" / "traffic jam"
-• "car trouble" / "car won't start" / "flat tire"
-• "overslept" / "slept through alarm" / "alarm didn't go off"
-• "doctor appointment running over" / "appointment running late"
-• "be there soon" / "on my way" / "almost there"
-• "15 min late" / "30 minutes" / "hour late"
-
-Common Late Phrases:
-• "Running behind"
-• "Stuck on highway"
-• "Train/bus delayed"
-• "Will be there in X minutes"
-• "Sorry, traffic is bad"
-• "Be in shortly"
-• "Leaving now but late"
+Accept ALL of these variations:
+✅ Typos: "sicl", "trafic", "laye", "feaver"
+✅ All caps: "RUNNING LATE", "SICK"
+✅ Text speak: "cant", "gonna", "b late", "2hrs", "tmrw", "rn"
+✅ No punctuation: "running late traffic"
+✅ Informal: "gotta", "wanna", "lemme", "kinda"
+✅ Misspellings: Accept any reasonable misspelling
+✅ Emojis: "😷 sick", "🤒", "🚗 broke down"
+✅ Questions: "can I come in late?", "is it ok if..."
+✅ Apologies: "sorry", "my bad", "apologize"
+✅ Past/future tense: "was sick", "will be late", "going to be out"
+✅ Abbreviations: "dr appt", "emerg", "appt", "min", "hr"
+✅ Multiple sentences: "Traffic is bad. Gonna be late. Sorry."
+✅ Compound: "running late 30 min traffic bad"
 
 ═══════════════════════════════════════════════════════════════════
-TYPE: **SICK** - Employee is NOT coming due to illness/health
+UNDERSTANDING DURATION & CLASSIFICATION
 ═══════════════════════════════════════════════════════════════════
 
-Keywords that mean SICK:
-• "sick" / "ill" / "not feeling well" / "unwell"
-• "flu" / "fever" / "cold" / "covid" / "coronavirus"
-• "throwing up" / "vomiting" / "nauseous" / "stomach bug"
-• "headache" / "migraine" / "dizzy"
-• "doctor" / "hospital" / "emergency room" / "ER"
-• "contagious" / "symptoms" / "tested positive"
-• "food poisoning" / "diarrhea"
-• "can't come in" / "not coming in" / "won't be in" (without other reason)
-• "staying home" (health context)
-• "under the weather"
-• "feeling terrible" / "really sick"
+Extract duration from MANY formats:
 
-Common Sick Phrases:
-• "I'm not feeling good"
-• "Got the flu"
-• "Really sick today"
-• "Can barely move"
-• "Doctor said to stay home"
-• "Too sick to work"
-• "Caught a bug"
-• "Need to rest"
-• "Going to urgent care"
+**Exact times:**
+• "30 minutes" / "30 min" / "30min" / "30 mins" / "30m" → 30 minutes
+• "half hour" / "1/2 hour" / ".5 hour" → 30 minutes
+• "1 hour" / "an hour" / "1hr" / "1h" / "60 min" → 60 minutes
+• "2 hours" / "2hrs" / "2h" / "couple hours" → 120 minutes
+• "3 hours" / "3hrs" / "3h" / "180 min" / "few hours" → 180 minutes
+• "4 hours" / "4hrs" / "4h" / "half day" → 240 minutes
+
+**Text numbers:**
+• "thirty minutes" / "thirty min" → 30 minutes
+• "one hour" / "an hour" → 60 minutes
+• "two hours" / "a couple hours" → 120 minutes
+
+**Ranges (use midpoint):**
+• "30-45 min" → 37 minutes
+• "1-2 hours" → 90 minutes
+• "2-3 hours" → 150 minutes
+
+**Relative/Vague (estimate):**
+• "soon" / "shortly" / "bit late" / "few min" → 15 minutes
+• "a while" / "bit" → 30 minutes
+• "long time" → 60 minutes
+
+**Time of arrival (calculate from now):**
+• "be there at 8:30" → Calculate delay from shift start
+• "in 30" / "in thirty" / "30 from now" → 30 minutes
+
+**Implied full day:**
+• "today" / "all day" / "not coming in" / "taking the day" → 480 minutes
+• "sick" (without duration) → 480 minutes (full day)
+• "can't make it" (without duration) → 480 minutes
+
+DURATION-BASED CLASSIFICATION:
+• **< 2 hours (< 120 min)** → LATE (tardiness, coming in late)
+• **2-4 hours (120-240 min)** → HALF_DAY (extended absence)
+• **4+ hours (240+ min)** or "not coming in" → FULL_DAY
 
 ═══════════════════════════════════════════════════════════════════
-TYPE: **PERSONAL** - Employee is NOT coming for non-health reasons
+COMPREHENSIVE SCENARIO DETECTION
 ═══════════════════════════════════════════════════════════════════
 
-Keywords that mean PERSONAL:
-• "personal day" / "personal leave" / "personal matter"
+**LATE** (coming to work, just delayed < 2 hours):
+
+Traffic/Transportation:
+• "traffic" / "stuck" / "highway" / "gridlock" / "accident on road"
+• "train delayed" / "bus late" / "missed bus" / "transit"
+• "car trouble" / "car won't start" / "flat tire" / "battery dead"
+• "no gas" / "out of gas" / "need gas"
+
+Personal delays:
+• "overslept" / "slept in" / "alarm didn't go off" / "slept through alarm"
+• "running behind" / "running late" / "delayed"
+• "taking too long" / "not ready" / "still getting ready"
+
+Already on way:
+• "be there soon" / "on my way" / "almost there" / "5 min away"
+• "leaving now" / "just left" / "headed in" / "en route"
+
+Any duration < 2 hours = LATE
+
+**HALF_DAY** (extended absence 2-4 hours):
+
+Mid-day appointments:
+• "need to step out" / "have to leave early" / "leaving at noon"
+• "doctor appointment" / "dentist" / "appointment at..."
+• "have an appointment" / "gotta run an errand"
+
+Partial day:
+• "coming in late" + duration > 2 hours
+• "half day" / "partial day" / "few hours"
+• "be gone for a while" / "out for a bit"
+
+Any duration 2-4 hours = HALF_DAY
+
+**FULL_DAY - SICK** (health-related full day absence):
+
+Illness keywords:
+• "sick" / "ill" / "not feeling well" / "unwell" / "under the weather"
+• "flu" / "fever" / "cold" / "covid" / "coronavirus" / "tested positive"
+• "throwing up" / "vomiting" / "nauseous" / "stomach" / "food poisoning"
+• "headache" / "migraine" / "dizzy" / "lightheaded"
+• "sore throat" / "cough" / "congested" / "allergies"
+• "back pain" / "hurt" / "injured" / "pain"
+• "diarrhea" / "bathroom" / "can't stop..."
+
+Medical:
+• "doctor" / "hospital" / "ER" / "emergency room" / "urgent care"
+• "clinic" / "medical" / "nurse" / "appointment" (health context)
+• "prescription" / "medication" / "meds"
+• "staying home sick" / "too sick to work"
+
+**FULL_DAY - PERSONAL** (non-health full day absence):
+
+Family/Personal:
 • "family emergency" / "family matter" / "family issue"
-• "child care" / "babysitter" / "kids are sick"
-• "funeral" / "death in family" / "passed away"
-• "court" / "legal matter" / "lawyer"
-• "appointment" (non-medical context or unspecified)
-• "taking the day off" / "need a day off"
-• "car in shop" / "no transportation" / "car broke down" (can't make it at all)
-• "house emergency" / "plumber" / "water leak"
-• "mental health day" / "stress" / "burnout"
+• "personal day" / "personal matter" / "personal business"
+• "kid is sick" / "kids are sick" / "child care" / "babysitter"
+• "spouse" / "husband" / "wife" / "parent" / "relative"
 
-Common Personal Phrases:
-• "Need to handle something"
-• "Personal issue came up"
-• "Can't make it today"
-• "Taking care of family"
-• "Have to deal with something"
-• "Emergency at home"
-• "Need the day"
+Appointments/Obligations:
+• "appointment" (non-medical) / "have to go to..."
+• "court" / "legal" / "lawyer" / "dmv" / "license"
+• "interview" / "meeting" / "orientation"
+• "funeral" / "burial" / "memorial" / "passed away"
+• "wedding" / "graduation" / "ceremony"
+
+Life events:
+• "moving" / "house" / "home" / "plumber" / "electrician" / "repair"
+• "car in shop" / "mechanic" / "no transportation" / "car broke down"
+• "errands" / "groceries" / "shopping" / "picking up..."
+• "mental health" / "stress" / "need a day" / "burnout"
+
+Generic absence (assume personal):
+• "not coming in" / "can't come in" / "won't be in"
+• "can't make it" / "not gonna make it" / "taking today off"
+• "need the day" / "taking a day"
+
+**UNCLEAR** (cannot determine):
+• Just greetings: "hi" / "hey" / "hello" / "sup" / "yo"
+• Single random words: "help" / "what" / "huh"
+• No useful context: "?"
+• Completely irrelevant text
 
 ═══════════════════════════════════════════════════════════════════
-TYPE: **UNCLEAR** - Cannot determine intent, need clarification
+REASON EXTRACTION - BE SMART
 ═══════════════════════════════════════════════════════════════════
 
-Messages that are UNCLEAR:
-• Just greetings: "hi" / "hey" / "hello" / "yo"
-• Single word: "help" / "yo" / "sup"
-• Vague: "something came up" / "I can't" / "not today"
-• No context: "sorry" / "can't make it" (without reason type)
-• Ambiguous: "having problems" / "issues" / "trouble"
-• Random text / gibberish / accidental messages
-• Question only: "what time?" / "when's my shift?"
+Accept ANY specific reason mentioned:
+✅ "traffic" → "Traffic"
+✅ "need to do groceries" → "Groceries"
+✅ "doctor appointment" → "Doctor appointment"
+✅ "flu" → "Flu"
+✅ "family emergency" → "Family emergency"
+✅ "car broke down" → "Car trouble"
 
-IMPORTANT CLARIFICATION RULES:
-1. If message has LATE keywords (late, delayed, traffic) → type is "late" NOT unclear
-2. If message has SICK keywords (sick, ill, fever) → type is "sick" NOT unclear
-3. If message has PERSONAL keywords (family, emergency, appointment) → type is "personal" NOT unclear
-4. ONLY mark as "unclear" if absolutely no keywords match any category
+Only flag as missing_reason if TRULY vague:
+❌ "I'll be late" (no reason given)
+❌ "can't come in" (no reason given)
+❌ "not today" (no reason given)
 
-EXAMPLES (STUDY THESE PATTERNS):
+If they mention a reason, accept it - don't be picky!
 
-LATE Examples:
-✅ "I'll be late" → {"type": "late", "reason": "Running late", "minutes_late": null}
-✅ "Running 30 min late" → {"type": "late", "reason": "Running late", "minutes_late": 30}
-✅ "Traffic is bad, be there in 20" → {"type": "late", "reason": "Traffic", "minutes_late": 20}
-✅ "Car won't start, gonna be late" → {"type": "late", "reason": "Car trouble", "minutes_late": null}
-✅ "Stuck on highway" → {"type": "late", "reason": "Traffic delay", "minutes_late": null}
-✅ "Overslept, be there soon" → {"type": "late", "reason": "Overslept", "minutes_late": null}
-✅ "15 minutes late - alarm didn't go off" → {"type": "late", "reason": "Overslept", "minutes_late": 15}
+═══════════════════════════════════════════════════════════════════
+COMPREHENSIVE EXAMPLES - LEARN THESE PATTERNS
+═══════════════════════════════════════════════════════════════════
 
-SICK Examples:
-✅ "I'm sick today" → {"type": "sick", "reason": "Feeling sick"}
-✅ "Got the flu" → {"type": "sick", "reason": "Flu"}
-✅ "Not feeling well" → {"type": "sick", "reason": "Not feeling well"}
-✅ "Throwing up" → {"type": "sick", "reason": "Vomiting"}
-✅ "Can't come in" → {"type": "sick", "reason": "Unable to come in"}
-✅ "Fever and headache" → {"type": "sick", "reason": "Fever and headache"}
-✅ "Doctor said stay home" → {"type": "sick", "reason": "Doctor's orders"}
-✅ "Covid symptoms" → {"type": "sick", "reason": "COVID symptoms"}
+**EDGE CASE EXAMPLES:**
 
-PERSONAL Examples:
-✅ "Personal day" → {"type": "personal", "reason": "Personal day"}
-✅ "Family emergency" → {"type": "personal", "reason": "Family emergency"}
-✅ "Kids are sick" → {"type": "personal", "reason": "Child care - kids sick"}
-✅ "Appointment today" → {"type": "personal", "reason": "Appointment"}
-✅ "Need to take care of something" → {"type": "personal", "reason": "Personal matter"}
-✅ "Car broke down completely" → {"type": "personal", "reason": "No transportation"}
-✅ "Court today" → {"type": "personal", "reason": "Legal matter"}
+1. "3 hours. Need to do groceries."
+→ {"type": "half_day", "subtype": "personal", "reason": "Groceries", "duration_minutes": 180, "has_duration": true, "has_reason": true, "missing_duration": false, "missing_reason": false}
 
-UNCLEAR Examples (need more info):
-❌ "Hey" → {"type": "unclear", "needs_clarification": true}
-❌ "Can't" → {"type": "unclear", "needs_clarification": true}
-❌ "Sorry" → {"type": "unclear", "needs_clarification": true}
-❌ "Problem" → {"type": "unclear", "needs_clarification": true}
+2. "RUNNING LATE TRAFFIC BAD" (all caps, no punctuation)
+→ {"type": "late", "subtype": null, "reason": "Traffic", "duration_minutes": null, "has_duration": false, "has_reason": true, "missing_duration": true, "missing_reason": false}
+
+3. "cant come in sicl with flu" (typos)
+→ {"type": "full_day", "subtype": "sick", "reason": "Flu", "duration_minutes": 480, "has_duration": true, "has_reason": true, "missing_duration": false, "missing_reason": false}
+
+4. "gonna b late 2hrs trafic" (text speak, typo)
+→ {"type": "half_day", "subtype": "personal", "reason": "Traffic", "duration_minutes": 120, "has_duration": true, "has_reason": true, "missing_duration": false, "missing_reason": false}
+
+5. "😷 sick today" (emoji)
+→ {"type": "full_day", "subtype": "sick", "reason": "Sick", "duration_minutes": 480, "has_duration": true, "has_reason": true, "missing_duration": false, "missing_reason": false}
+
+6. "car broke down. be there in an hour" (compound)
+→ {"type": "late", "subtype": null, "reason": "Car broke down", "duration_minutes": 60, "has_duration": true, "has_reason": true, "missing_duration": false, "missing_reason": false}
+
+7. "Dr appt tmrw 3hrs" (abbreviations)
+→ {"type": "half_day", "subtype": "personal", "reason": "Doctor appointment", "duration_minutes": 180, "has_duration": true, "has_reason": true, "missing_duration": false, "missing_reason": false}
+
+8. "can i come in late? stuck in traffic" (question format)
+→ {"type": "late", "subtype": null, "reason": "Traffic", "duration_minutes": null, "has_duration": false, "has_reason": true, "missing_duration": true, "missing_reason": false}
+
+9. "sorry running behind overslept 30 min" (apology + compound)
+→ {"type": "late", "subtype": null, "reason": "Overslept", "duration_minutes": 30, "has_duration": true, "has_reason": true, "missing_duration": false, "missing_reason": false}
+
+10. "feaver and headake not feeling good" (multiple typos)
+→ {"type": "full_day", "subtype": "sick", "reason": "Fever and headache", "duration_minutes": 480, "has_duration": true, "has_reason": true, "missing_duration": false, "missing_reason": false}
+
+11. "need to step out for dentist" (implied appointment)
+→ {"type": "unclear_duration", "subtype": "personal", "reason": "Dentist appointment", "duration_minutes": null, "has_duration": false, "has_reason": true, "missing_duration": true, "missing_reason": false}
+
+12. "be there soon traffic" (vague duration)
+→ {"type": "late", "subtype": null, "reason": "Traffic", "duration_minutes": 15, "has_duration": true, "has_reason": true, "missing_duration": false, "missing_reason": false}
+
+13. "kids sick gotta stay home" (child care)
+→ {"type": "full_day", "subtype": "personal", "reason": "Kids sick - child care", "duration_minutes": 480, "has_duration": true, "has_reason": true, "missing_duration": false, "missing_reason": false}
+
+14. "couple hours late groceries" (informal duration)
+→ {"type": "half_day", "subtype": "personal", "reason": "Groceries", "duration_minutes": 120, "has_duration": true, "has_reason": true, "missing_duration": false, "missing_reason": false}
+
+15. "I will be late this morning" (no details)
+→ {"type": "late", "subtype": null, "reason": null, "duration_minutes": null, "has_duration": false, "has_reason": false, "missing_duration": true, "missing_reason": true}
+
+16. "180 minutes" (just numbers - from follow-up)
+→ {"type": "half_day", "subtype": "personal", "reason": null, "duration_minutes": 180, "has_duration": true, "has_reason": false, "missing_duration": false, "missing_reason": true}
+
+17. "30min" (compact format)
+→ {"type": "late", "subtype": null, "reason": null, "duration_minutes": 30, "has_duration": true, "has_reason": false, "missing_duration": false, "missing_reason": true}
+
+18. "half day appointment" (clear)
+→ {"type": "half_day", "subtype": "personal", "reason": "Appointment", "duration_minutes": 240, "has_duration": true, "has_reason": true, "missing_duration": false, "missing_reason": false}
+
+19. "leaving early family emergency" (urgent)
+→ {"type": "unclear_duration", "subtype": "personal", "reason": "Family emergency", "duration_minutes": null, "has_duration": false, "has_reason": true, "missing_duration": true, "missing_reason": false}
+
+20. "throwing up all night cant come in" (sick detail)
+→ {"type": "full_day", "subtype": "sick", "reason": "Throwing up", "duration_minutes": 480, "has_duration": true, "has_reason": true, "missing_duration": false, "missing_reason": false}
+
+21. "1-2 hours late" (range)
+→ {"type": "late", "subtype": null, "reason": null, "duration_minutes": 90, "has_duration": true, "has_reason": false, "missing_duration": false, "missing_reason": true}
+
+22. "not coming in today personal matter" (clear absence)
+→ {"type": "full_day", "subtype": "personal", "reason": "Personal matter", "duration_minutes": 480, "has_duration": true, "has_reason": true, "missing_duration": false, "missing_reason": false}
+
+23. "on my way just 15 late traffic" (already coming)
+→ {"type": "late", "subtype": null, "reason": "Traffic", "duration_minutes": 15, "has_duration": true, "has_reason": true, "missing_duration": false, "missing_reason": false}
+
+24. "taking the day mental health" (mental health)
+→ {"type": "full_day", "subtype": "personal", "reason": "Mental health day", "duration_minutes": 480, "has_duration": true, "has_reason": true, "missing_duration": false, "missing_reason": false}
+
+25. "court today" (legal)
+→ {"type": "full_day", "subtype": "personal", "reason": "Court", "duration_minutes": 480, "has_duration": true, "has_reason": true, "missing_duration": false, "missing_reason": false}
 
 ══════════════════════════════════════════════════════════════════
-CRITICAL OUTPUT REQUIREMENTS - READ THIS CAREFULLY:
+OUTPUT FORMAT - JSON ONLY
 ══════════════════════════════════════════════════════════════════
 
-YOU MUST respond with ONLY valid JSON. NO explanations, NO analysis, NO text before or after the JSON.
+YOU MUST respond with ONLY valid JSON. Start with { and end with }.
 
-CORRECT (✅):
-{"type": "late", "reason": "Traffic", "expected_return": null, "minutes_late": 30, "needs_clarification": false}
-
-WRONG (❌):
-Looking at this message... [analysis text]
-{JSON here}
-
-WRONG (❌):
-\`\`\`json
-{JSON here}
-\`\`\`
-
-YOUR RESPONSE MUST START WITH { AND END WITH }. NOTHING ELSE.
-
-Required JSON format:
 {
-  "type": "sick|late|personal|unclear",
-  "reason": "specific reason from message",
-  "expected_return": "YYYY-MM-DD or null",
-  "minutes_late": number or null,
-  "needs_clarification": boolean
+  "type": "late|half_day|full_day|unclear|unclear_duration",
+  "subtype": "sick|personal|null",
+  "reason": "extracted reason or null",
+  "duration_minutes": number or null,
+  "has_duration": boolean,
+  "has_reason": boolean,
+  "missing_duration": boolean,
+  "missing_reason": boolean
 }
 
-REASONING GUIDELINES:
-- Be SPECIFIC: "traffic" → "Traffic", NOT "Running late"
-- Be SPECIFIC: "flu" → "Flu", NOT "Feeling sick"
-- Extract minutes if mentioned (30 min, 1 hour = 60, etc.)
-- needs_clarification = true ONLY if type is "unclear"
-- Respond immediately with JSON - no thinking out loud`;
+Field Definitions:
+• type: Primary classification (late/half_day/full_day/unclear/unclear_duration)
+• subtype: For full_day/half_day, is it "sick" or "personal"? null for late
+• reason: The specific reason extracted from message, or null
+• duration_minutes: Extracted duration in minutes, or null
+• has_duration: true if any duration info found (even implied like "all day")
+• has_reason: true if any reason found (even minimal like "traffic")
+• missing_duration: true if we need to ask for duration
+• missing_reason: true if we need to ask for reason
+
+RESPOND WITH JSON ONLY - NO EXPLANATIONS!`;
 
     console.log('   🔄 Calling Claude API...');
     console.log('   📝 Message to parse:', messageBody);
@@ -218,113 +354,65 @@ REASONING GUIDELINES:
     // Parse JSON response
     const parsed = JSON.parse(responseText);
 
-    // Check if needs clarification
-    if (parsed.needs_clarification || parsed.type === 'unclear') {
+    console.log('   📊 Parsed data:', JSON.stringify(parsed, null, 2));
+
+    // Handle completely unclear messages
+    if (parsed.type === 'unclear') {
       return {
         success: false,
         needs_clarification: true,
-        needs_reason: false,
-        error: 'Message too vague'
+        ask_what: 'status', // Ask: are you late, sick, or out?
+        error: 'Message unclear'
       };
     }
 
-    // Validate
-    if (!parsed.type || !['sick', 'late', 'personal'].includes(parsed.type)) {
-      return {
-        success: false,
-        needs_clarification: true,
-        needs_reason: false,
-        error: 'Invalid type'
-      };
-    }
-
-    // Check if reason is too generic (needs more detail)
-    const genericReasons = [
-      // Generic absence reasons
-      'unable to come in',
-      'not coming in',
-      'can\'t come in',
-      'won\'t be in',
-      'absent',
-      'not available',
-      'can\'t make it',
-      'unavailable',
-
-      // Generic late reasons (only vague ones)
-      'running late',
-      'gonna be late',
-      'will be late',
-      'late today',
-      'behind schedule',
-
-      // Generic sick reasons
-      'feeling sick',
-      'not feeling well',
-      'feeling ill',
-      'unwell',
-      'sick today',
-      'not well',
-
-      // Generic personal reasons
-      'personal matter',
-      'personal issue',
-      'personal business',
-      'personal reasons',
-      'family matter',
-      'family issue',
-
-      // Truly vague
-      'no reason provided',
-      'not specified',
-      'unspecified',
-      'something came up',
-      'have to deal with something',
-      'need to handle something',
-      'taking care of something',
-      'issues',
-      'problems',
-      'trouble'
-    ];
-
-    const reasonLower = (parsed.reason || '').toLowerCase().trim();
-
-    // Check if reason is too generic or too short
-    const isGenericReason = genericReasons.some(generic => {
-      // Exact match or very close match
-      return reasonLower === generic ||
-             reasonLower.includes(generic) ||
-             generic.includes(reasonLower);
-    });
-
-    // Also check if reason is suspiciously short (less than 4 chars and not specific)
-    const isTooShort = reasonLower.length < 4 && !['flu', 'er', 'icu'].includes(reasonLower);
-
-    // For late, also check if minutes are missing
-    const needsMinutes = parsed.type === 'late' && !parsed.minutes_late;
-
-    // Check if we need more details
-    if (isGenericReason || isTooShort || needsMinutes) {
-      console.log('   ⚠️ Needs more details:');
-      console.log('      - Generic reason:', isGenericReason);
-      console.log('      - Too short:', isTooShort);
-      console.log('      - Missing minutes:', needsMinutes);
-
+    // Handle messages with unclear duration (e.g., "doctor appointment" but no time specified)
+    if (parsed.type === 'unclear_duration') {
       return {
         success: false,
         needs_clarification: false,
-        needs_reason: true,
-        type: parsed.type,
-        missing_minutes: needsMinutes,
-        error: 'Needs more details'
+        ask_what: 'duration', // Ask: how long?
+        subtype: parsed.subtype,
+        reason: parsed.reason,
+        error: 'Duration not specified'
       };
     }
 
+    // Check if we need to ask for duration
+    if (parsed.missing_duration && parsed.type !== 'full_day') {
+      console.log('   ⚠️ Missing duration');
+      return {
+        success: false,
+        needs_clarification: false,
+        ask_what: 'duration',
+        type: parsed.type,
+        subtype: parsed.subtype,
+        reason: parsed.reason,
+        error: 'Duration needed'
+      };
+    }
+
+    // Check if we need to ask for reason
+    if (parsed.missing_reason) {
+      console.log('   ⚠️ Missing reason');
+      return {
+        success: false,
+        needs_clarification: false,
+        ask_what: 'reason',
+        type: parsed.type,
+        subtype: parsed.subtype,
+        duration_minutes: parsed.duration_minutes,
+        error: 'Reason needed'
+      };
+    }
+
+    // Success - we have all the info we need
     return {
       success: true,
       type: parsed.type,
-      reason: parsed.reason || 'No reason provided',
-      expected_return: parsed.expected_return,
-      minutes_late: parsed.minutes_late
+      subtype: parsed.subtype,
+      reason: parsed.reason,
+      duration_minutes: parsed.duration_minutes
     };
 
   } catch (error) {
@@ -345,27 +433,43 @@ exports.logAbsenceFromSMS = async ({ employee, parsedData, originalMessage, phon
     const noticeCheck = attendanceService.checkNoticeTime(employee, callTime);
 
     let pointsAwarded = 0;
-    let type = parsedData.type;
+    let absenceType = 'sick'; // Database type field
+    const duration = parsedData.duration_minutes || 0;
 
+    // Calculate points based on duration and type
     if (parsedData.type === 'late') {
-      type = 'late';
+      // < 2 hours late = 0.33 points (tardiness)
+      absenceType = 'late';
       pointsAwarded = 0.33;
-    } else {
-      pointsAwarded = attendanceService.calculatePointsToAward(parsedData.type);
+    } else if (parsedData.type === 'half_day') {
+      // 2-4 hours = 0.5 points (half day absence)
+      absenceType = parsedData.subtype || 'personal'; // Use subtype (sick/personal)
+      pointsAwarded = 0.5;
+    } else if (parsedData.type === 'full_day') {
+      // 4+ hours or full day = 1.0 point
+      absenceType = parsedData.subtype || 'sick'; // Use subtype (sick/personal)
+      pointsAwarded = 1.0;
     }
 
     const stationImpact = await attendanceService.checkStationImpact(employee.work_station);
+
+    // Format reason with duration info
+    let formattedReason = parsedData.reason || 'No reason provided';
+    if (parsedData.type === 'late' && duration > 0) {
+      formattedReason = `${duration} min - ${formattedReason}`;
+    } else if (parsedData.type === 'half_day' && duration > 0) {
+      const hours = Math.round(duration / 60 * 10) / 10; // Round to 1 decimal
+      formattedReason = `${hours} hours - ${formattedReason}`;
+    }
 
     const absence = await Absence.create({
       employee_id: employee._id,
       employee_name: employee.name,
       work_station: employee.work_station,
       date: new Date(),
-      type,
-      reason: parsedData.type === 'late'
-        ? `${parsedData.minutes_late || 'Unknown'} minutes late - ${parsedData.reason}`
-        : parsedData.reason,
-      expected_return: parsedData.expected_return ? new Date(parsedData.expected_return) : null,
+      type: absenceType,
+      reason: formattedReason,
+      expected_return: null, // Can be added later if needed
       report_time: callTime,
       report_method: 'sms',
       report_message: originalMessage,
@@ -377,7 +481,8 @@ exports.logAbsenceFromSMS = async ({ employee, parsedData, originalMessage, phon
     console.log(`✅ ABSENCE SAVED FROM SMS:`);
     console.log(`   ID: ${absence._id}`);
     console.log(`   Employee: ${employee.name}`);
-    console.log(`   Type: ${type}`);
+    console.log(`   Type: ${absenceType} (${parsedData.type})`);
+    console.log(`   Duration: ${duration} minutes`);
     console.log(`   Points: ${pointsAwarded}`);
 
     // Update employee stats
@@ -398,35 +503,45 @@ exports.generateResponseMessage = async (employee, absence, parsedData) => {
   const updatedEmployee = await Employee.findById(employee._id);
 
   const points = updatedEmployee.points_current_quarter;
+  const duration = parsedData.duration_minutes || 0;
 
   let message = `Got it, ${employee.name}. `;
 
   // Confirm what was logged
   if (parsedData.type === 'late') {
-    message += `Logged as late (${parsedData.minutes_late || 'unknown'} min). `;
-  } else if (parsedData.type === 'sick') {
-    message += `Logged as sick. `;
-  } else {
-    message += `Logged as personal day. `;
+    const mins = duration > 0 ? `${duration} min` : 'late';
+    message += `Logged as late (${mins}). `;
+  } else if (parsedData.type === 'half_day') {
+    const hours = duration > 0 ? `${Math.round(duration / 60 * 10) / 10} hours` : 'half day';
+    const typeLabel = parsedData.subtype === 'sick' ? 'sick (half day)' : 'personal (half day)';
+    message += `Logged as ${typeLabel} (${hours}). `;
+  } else if (parsedData.type === 'full_day') {
+    const typeLabel = parsedData.subtype === 'sick' ? 'sick' : 'personal day';
+    message += `Logged as ${typeLabel}. `;
   }
 
-  // Points status
-  message += `You now have ${points} points. `;
+  // Only show status when it matters (not for low points)
+  const shouldShowStatus = points >= 2.5; // Show when getting close to watch threshold
 
-  // Status messages
+  if (shouldShowStatus) {
+    message += `You now have ${points} points. `;
+  }
+
+  // Status messages - only show when important
   if (points >= 6) {
-    message += `⚠️ FORMAL REVIEW REQUIRED - You have reached 6+ points. A formal review meeting will be scheduled.`;
+    message += `🚨 FORMAL REVIEW REQUIRED - You've reached the 6-point threshold. A formal review meeting will be scheduled. Please speak with your supervisor.`;
+  } else if (points >= 5) {
+    message += `⚠️ CRITICAL - You're at ${points} points. One more absence will trigger a formal review.`;
   } else if (points >= 4) {
-    message += `⚠️ AT RISK - You're approaching the 6-point threshold. Need support? Reply "YES" to talk to your supervisor.`;
+    message += `⚠️ AT RISK - You're at ${points} points. Please be very mindful of attendance.`;
+  } else if (points >= 3.5) {
+    message += `⚠️ WARNING - You're at ${points} points and approaching the at-risk threshold (4 points).`;
   } else if (points >= 3) {
-    message += `⚠️ WATCH - Please be mindful of attendance.`;
-  } else {
-    message += `✅ Good standing.`;
+    message += `⚠️ WATCH - You've reached ${points} points. Please be mindful of attendance.`;
+  } else if (points >= 2.5) {
+    message += `You're approaching the 3-point watch threshold.`;
   }
-
-  if (parsedData.expected_return) {
-    message += ` See you ${parsedData.expected_return}.`;
-  }
+  // If points < 2.5, don't show any status - they're doing fine!
 
   return message;
 };

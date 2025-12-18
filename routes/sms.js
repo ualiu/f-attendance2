@@ -42,6 +42,13 @@ router.post('/incoming', async (req, res) => {
 
     console.log('   ✅ Employee found:', employee.name);
 
+    // Check if this is a follow-up message (conversation already active)
+    const isFollowUp = smsService.isFollowUpMessage(phoneNumber);
+    console.log('   🔄 Is follow-up message:', isFollowUp);
+
+    // Mark this conversation as active
+    smsService.markConversationActive(phoneNumber);
+
     // Parse the SMS message using Claude LLM
     const parsedData = await smsService.parseAttendanceMessage(messageBody, employee);
 
@@ -52,34 +59,53 @@ router.post('/incoming', async (req, res) => {
       console.log('   📋 Full parsed data:', JSON.stringify(parsedData, null, 2));
 
       const twiml = new twilio.twiml.MessagingResponse();
+      let followUpMessage = '';
 
-      if (parsedData.needs_reason) {
-        console.log('   💬 Sending follow-up request for more details...');
-        // Type is identified, but needs more details
-        if (parsedData.type === 'sick') {
-          twiml.message(`Hi ${employee.name}, got it. What's the specific reason? (e.g., flu, fever, doctor appt)`);
-        } else if (parsedData.type === 'late') {
-          if (parsedData.missing_minutes) {
-            twiml.message(`Hi ${employee.name}, how many minutes late and why? (e.g., "30 min - traffic")`);
-          } else {
-            twiml.message(`Hi ${employee.name}, what's the reason you're late? (e.g., traffic, car trouble)`);
-          }
-        } else if (parsedData.type === 'personal') {
-          twiml.message(`Hi ${employee.name}, what's the reason for personal day? (e.g., family emergency, appt)`);
+      // Only greet on first message, not on follow-ups
+      const greeting = isFollowUp ? '' : `Hi ${employee.name}, `;
+
+      // Determine what to ask based on what's missing
+      if (parsedData.ask_what === 'status') {
+        // Completely unclear - ask what's happening
+        console.log('   💬 Asking for status (sick/late/out)...');
+        followUpMessage = `${greeting}are you running late, calling out sick, or taking time off today?`;
+      }
+      else if (parsedData.ask_what === 'duration') {
+        // We know the type but not duration
+        console.log('   💬 Asking for duration...');
+
+        if (parsedData.type === 'late' || parsedData.type === 'unclear_duration') {
+          followUpMessage = `${greeting}how late will you be? (e.g., "30 min", "2 hours")`;
+        } else {
+          followUpMessage = `${greeting}how long will you be out? (e.g., "few hours", "half day", "all day")`;
         }
-        console.log('   📤 Follow-up message prepared, sending TwiML response...');
-      } else if (parsedData.needs_clarification) {
-        console.log('   💬 Sending clarification request...');
-        twiml.message(`Hi ${employee.name}, please clarify: Are you sick, running late (how many min?), or taking a personal day?`);
-        console.log('   📤 Clarification message prepared, sending TwiML response...');
-      } else {
+      }
+      else if (parsedData.ask_what === 'reason') {
+        // We know duration/type but not reason
+        console.log('   💬 Asking for reason...');
+
+        if (parsedData.type === 'late') {
+          followUpMessage = `${greeting}why are you running late? (e.g., traffic, car trouble, appointment)`;
+        } else if (parsedData.type === 'half_day' || parsedData.type === 'full_day') {
+          if (parsedData.subtype === 'sick') {
+            followUpMessage = `${greeting}what's going on? (e.g., flu, headache, doctor visit)`;
+          } else {
+            followUpMessage = `${greeting}what's the reason? (e.g., appointment, errands, family matter)`;
+          }
+        } else {
+          followUpMessage = `${greeting}what's the reason?`;
+        }
+      }
+      else {
+        // Fallback - generic help
         console.log('   💬 Sending generic help message...');
-        twiml.message(`Hi ${employee.name}, please text: "Sick - [reason]", "30 min late - [reason]", or "Personal - [reason]"`);
-        console.log('   📤 Generic help message prepared, sending TwiML response...');
+        followUpMessage = `${greeting}please text something like: "Running 30 min late - traffic" or "Sick with flu" or "Out for appointment"`;
       }
 
+      twiml.message(followUpMessage);
+      console.log('   📤 Follow-up message:', followUpMessage);
+
       const twimlString = twiml.toString();
-      console.log('   📤 Final TwiML:', twimlString);
       res.type('text/xml');
       return res.send(twimlString);
     }
