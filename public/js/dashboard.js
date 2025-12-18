@@ -31,24 +31,27 @@ function updateDashboard(data) {
   console.log('Dashboard data refreshed:', data);
 }
 
-// View transcript modal
-async function viewTranscript(absenceId) {
+// View message modal
+async function viewMessage(absenceId) {
   try {
-    const response = await fetch(`/api/calls/${absenceId}`);
-    if (!response.ok) throw new Error('Failed to fetch transcript');
+    const response = await fetch(`/api/absences/${absenceId}`);
+    if (!response.ok) throw new Error('Failed to fetch message');
 
     const data = await response.json();
 
-    if (data.success && data.absence.call_transcript) {
-      showModal('Call Transcript', data.absence.call_transcript);
+    if (data.success && data.absence.report_message) {
+      showModal('Report Message', data.absence.report_message);
     } else {
-      alert('Transcript not available for this call');
+      alert('Message not available for this report');
     }
   } catch (err) {
-    console.error('Error loading transcript:', err);
-    alert('Error loading transcript');
+    console.error('Error loading message:', err);
+    alert('Error loading message');
   }
 }
+
+// Backwards compatibility
+const viewTranscript = viewMessage;
 
 function showModal(title, content) {
   // Create a simple modal
@@ -112,6 +115,7 @@ function validateEmail(email) {
 // Export for use in other scripts
 window.FeltonAttendance = {
   refreshDashboardData,
+  viewMessage,
   viewTranscript,
   showModal,
   validatePhone,

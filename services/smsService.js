@@ -9,46 +9,184 @@ const anthropic = new Anthropic({
 // Parse attendance message using Claude
 exports.parseAttendanceMessage = async (messageBody, employee) => {
   try {
-    const prompt = `You are an attendance parser for Felton Brushes manufacturing company.
+    const prompt = `You are an expert attendance message parser for Felton Brushes manufacturing company. Your job is to accurately classify employee attendance messages and extract specific details.
 
 Employee: ${employee.name}
 Current Points: ${employee.points_current_quarter}
 Work Station: ${employee.work_station}
 Shift: ${employee.shift}
 
-Parse this attendance message and extract structured data:
+MESSAGE TO PARSE:
 "${messageBody}"
 
-Be SMART about interpreting natural language:
-- "Can't come in" / "Won't be in" / "Not coming" → Assume SICK unless they specify otherwise
-- "Running late" / "Gonna be late" → Type is LATE
-- "Personal day" / "Need the day off" → Type is PERSONAL
-- If they don't give a reason, infer one from context
+CLASSIFICATION RULES (READ CAREFULLY):
 
-Determine:
-1. Type: "sick", "late", "personal", or "unclear"
-2. Reason: Brief description (infer if not explicitly stated)
-3. Expected return: If they mention when they'll be back (format: YYYY-MM-DD, or null)
-4. Minutes late: If type is "late", how many minutes (number, or null)
-5. Needs clarification: true if message is too vague to determine type
+═══════════════════════════════════════════════════════════════════
+TYPE: **LATE** - Employee IS coming to work, just delayed/tardy
+═══════════════════════════════════════════════════════════════════
 
-Examples:
-- "I'm sick today" → type: sick, reason: "Feeling sick", needs_clarification: false
-- "Can't come in today" → type: sick, reason: "Unable to come in", needs_clarification: false
-- "Not feeling well" → type: sick, reason: "Not feeling well", needs_clarification: false
-- "Running 30 min late, traffic" → type: late, minutes_late: 30, reason: "Traffic", needs_clarification: false
-- "Taking a personal day" → type: personal, reason: "Personal day", needs_clarification: false
-- "Won't be there" → type: sick, reason: "Absent", needs_clarification: false
-- "Hey" → type: unclear, needs_clarification: true
+Keywords that ALWAYS mean LATE:
+• "late" / "delayed" / "tardy" / "behind schedule"
+• "running late" / "gonna be late" / "will be late" / "I'll be late"
+• "stuck in traffic" / "traffic delay" / "traffic jam"
+• "car trouble" / "car won't start" / "flat tire"
+• "overslept" / "slept through alarm" / "alarm didn't go off"
+• "doctor appointment running over" / "appointment running late"
+• "be there soon" / "on my way" / "almost there"
+• "15 min late" / "30 minutes" / "hour late"
 
-Respond ONLY with valid JSON:
+Common Late Phrases:
+• "Running behind"
+• "Stuck on highway"
+• "Train/bus delayed"
+• "Will be there in X minutes"
+• "Sorry, traffic is bad"
+• "Be in shortly"
+• "Leaving now but late"
+
+═══════════════════════════════════════════════════════════════════
+TYPE: **SICK** - Employee is NOT coming due to illness/health
+═══════════════════════════════════════════════════════════════════
+
+Keywords that mean SICK:
+• "sick" / "ill" / "not feeling well" / "unwell"
+• "flu" / "fever" / "cold" / "covid" / "coronavirus"
+• "throwing up" / "vomiting" / "nauseous" / "stomach bug"
+• "headache" / "migraine" / "dizzy"
+• "doctor" / "hospital" / "emergency room" / "ER"
+• "contagious" / "symptoms" / "tested positive"
+• "food poisoning" / "diarrhea"
+• "can't come in" / "not coming in" / "won't be in" (without other reason)
+• "staying home" (health context)
+• "under the weather"
+• "feeling terrible" / "really sick"
+
+Common Sick Phrases:
+• "I'm not feeling good"
+• "Got the flu"
+• "Really sick today"
+• "Can barely move"
+• "Doctor said to stay home"
+• "Too sick to work"
+• "Caught a bug"
+• "Need to rest"
+• "Going to urgent care"
+
+═══════════════════════════════════════════════════════════════════
+TYPE: **PERSONAL** - Employee is NOT coming for non-health reasons
+═══════════════════════════════════════════════════════════════════
+
+Keywords that mean PERSONAL:
+• "personal day" / "personal leave" / "personal matter"
+• "family emergency" / "family matter" / "family issue"
+• "child care" / "babysitter" / "kids are sick"
+• "funeral" / "death in family" / "passed away"
+• "court" / "legal matter" / "lawyer"
+• "appointment" (non-medical context or unspecified)
+• "taking the day off" / "need a day off"
+• "car in shop" / "no transportation" / "car broke down" (can't make it at all)
+• "house emergency" / "plumber" / "water leak"
+• "mental health day" / "stress" / "burnout"
+
+Common Personal Phrases:
+• "Need to handle something"
+• "Personal issue came up"
+• "Can't make it today"
+• "Taking care of family"
+• "Have to deal with something"
+• "Emergency at home"
+• "Need the day"
+
+═══════════════════════════════════════════════════════════════════
+TYPE: **UNCLEAR** - Cannot determine intent, need clarification
+═══════════════════════════════════════════════════════════════════
+
+Messages that are UNCLEAR:
+• Just greetings: "hi" / "hey" / "hello" / "yo"
+• Single word: "help" / "yo" / "sup"
+• Vague: "something came up" / "I can't" / "not today"
+• No context: "sorry" / "can't make it" (without reason type)
+• Ambiguous: "having problems" / "issues" / "trouble"
+• Random text / gibberish / accidental messages
+• Question only: "what time?" / "when's my shift?"
+
+IMPORTANT CLARIFICATION RULES:
+1. If message has LATE keywords (late, delayed, traffic) → type is "late" NOT unclear
+2. If message has SICK keywords (sick, ill, fever) → type is "sick" NOT unclear
+3. If message has PERSONAL keywords (family, emergency, appointment) → type is "personal" NOT unclear
+4. ONLY mark as "unclear" if absolutely no keywords match any category
+
+EXAMPLES (STUDY THESE PATTERNS):
+
+LATE Examples:
+✅ "I'll be late" → {"type": "late", "reason": "Running late", "minutes_late": null}
+✅ "Running 30 min late" → {"type": "late", "reason": "Running late", "minutes_late": 30}
+✅ "Traffic is bad, be there in 20" → {"type": "late", "reason": "Traffic", "minutes_late": 20}
+✅ "Car won't start, gonna be late" → {"type": "late", "reason": "Car trouble", "minutes_late": null}
+✅ "Stuck on highway" → {"type": "late", "reason": "Traffic delay", "minutes_late": null}
+✅ "Overslept, be there soon" → {"type": "late", "reason": "Overslept", "minutes_late": null}
+✅ "15 minutes late - alarm didn't go off" → {"type": "late", "reason": "Overslept", "minutes_late": 15}
+
+SICK Examples:
+✅ "I'm sick today" → {"type": "sick", "reason": "Feeling sick"}
+✅ "Got the flu" → {"type": "sick", "reason": "Flu"}
+✅ "Not feeling well" → {"type": "sick", "reason": "Not feeling well"}
+✅ "Throwing up" → {"type": "sick", "reason": "Vomiting"}
+✅ "Can't come in" → {"type": "sick", "reason": "Unable to come in"}
+✅ "Fever and headache" → {"type": "sick", "reason": "Fever and headache"}
+✅ "Doctor said stay home" → {"type": "sick", "reason": "Doctor's orders"}
+✅ "Covid symptoms" → {"type": "sick", "reason": "COVID symptoms"}
+
+PERSONAL Examples:
+✅ "Personal day" → {"type": "personal", "reason": "Personal day"}
+✅ "Family emergency" → {"type": "personal", "reason": "Family emergency"}
+✅ "Kids are sick" → {"type": "personal", "reason": "Child care - kids sick"}
+✅ "Appointment today" → {"type": "personal", "reason": "Appointment"}
+✅ "Need to take care of something" → {"type": "personal", "reason": "Personal matter"}
+✅ "Car broke down completely" → {"type": "personal", "reason": "No transportation"}
+✅ "Court today" → {"type": "personal", "reason": "Legal matter"}
+
+UNCLEAR Examples (need more info):
+❌ "Hey" → {"type": "unclear", "needs_clarification": true}
+❌ "Can't" → {"type": "unclear", "needs_clarification": true}
+❌ "Sorry" → {"type": "unclear", "needs_clarification": true}
+❌ "Problem" → {"type": "unclear", "needs_clarification": true}
+
+══════════════════════════════════════════════════════════════════
+CRITICAL OUTPUT REQUIREMENTS - READ THIS CAREFULLY:
+══════════════════════════════════════════════════════════════════
+
+YOU MUST respond with ONLY valid JSON. NO explanations, NO analysis, NO text before or after the JSON.
+
+CORRECT (✅):
+{"type": "late", "reason": "Traffic", "expected_return": null, "minutes_late": 30, "needs_clarification": false}
+
+WRONG (❌):
+Looking at this message... [analysis text]
+{JSON here}
+
+WRONG (❌):
+\`\`\`json
+{JSON here}
+\`\`\`
+
+YOUR RESPONSE MUST START WITH { AND END WITH }. NOTHING ELSE.
+
+Required JSON format:
 {
   "type": "sick|late|personal|unclear",
-  "reason": "string",
+  "reason": "specific reason from message",
   "expected_return": "YYYY-MM-DD or null",
   "minutes_late": number or null,
   "needs_clarification": boolean
-}`;
+}
+
+REASONING GUIDELINES:
+- Be SPECIFIC: "traffic" → "Traffic", NOT "Running late"
+- Be SPECIFIC: "flu" → "Flu", NOT "Feeling sick"
+- Extract minutes if mentioned (30 min, 1 hour = 60, etc.)
+- needs_clarification = true ONLY if type is "unclear"
+- Respond immediately with JSON - no thinking out loud`;
 
     console.log('   🔄 Calling Claude API...');
     console.log('   📝 Message to parse:', messageBody);
@@ -68,6 +206,13 @@ Respond ONLY with valid JSON:
 
     // Strip markdown code blocks if present
     responseText = responseText.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+
+    // Extract JSON from response (sometimes Claude adds explanation before JSON)
+    const jsonMatch = responseText.match(/\{[\s\S]*\}/);
+    if (jsonMatch) {
+      responseText = jsonMatch[0];
+    }
+
     console.log('   📋 Cleaned response:', responseText);
 
     // Parse JSON response
@@ -78,6 +223,7 @@ Respond ONLY with valid JSON:
       return {
         success: false,
         needs_clarification: true,
+        needs_reason: false,
         error: 'Message too vague'
       };
     }
@@ -87,7 +233,89 @@ Respond ONLY with valid JSON:
       return {
         success: false,
         needs_clarification: true,
+        needs_reason: false,
         error: 'Invalid type'
+      };
+    }
+
+    // Check if reason is too generic (needs more detail)
+    const genericReasons = [
+      // Generic absence reasons
+      'unable to come in',
+      'not coming in',
+      'can\'t come in',
+      'won\'t be in',
+      'absent',
+      'not available',
+      'can\'t make it',
+      'unavailable',
+
+      // Generic late reasons (only vague ones)
+      'running late',
+      'gonna be late',
+      'will be late',
+      'late today',
+      'behind schedule',
+
+      // Generic sick reasons
+      'feeling sick',
+      'not feeling well',
+      'feeling ill',
+      'unwell',
+      'sick today',
+      'not well',
+
+      // Generic personal reasons
+      'personal matter',
+      'personal issue',
+      'personal business',
+      'personal reasons',
+      'family matter',
+      'family issue',
+
+      // Truly vague
+      'no reason provided',
+      'not specified',
+      'unspecified',
+      'something came up',
+      'have to deal with something',
+      'need to handle something',
+      'taking care of something',
+      'issues',
+      'problems',
+      'trouble'
+    ];
+
+    const reasonLower = (parsed.reason || '').toLowerCase().trim();
+
+    // Check if reason is too generic or too short
+    const isGenericReason = genericReasons.some(generic => {
+      // Exact match or very close match
+      return reasonLower === generic ||
+             reasonLower.includes(generic) ||
+             generic.includes(reasonLower);
+    });
+
+    // Also check if reason is suspiciously short (less than 4 chars and not specific)
+    const isTooShort = reasonLower.length < 4 && !['flu', 'er', 'icu'].includes(reasonLower);
+
+    // For late, also check if minutes are missing
+    const needsMinutes = parsed.type === 'late' && !parsed.minutes_late;
+
+    // Check if we need more details
+    if (isGenericReason || isTooShort || needsMinutes) {
+      console.log('   ⚠️ Needs more details:');
+      console.log('      - Generic reason:', isGenericReason);
+      console.log('      - Too short:', isTooShort);
+      console.log('      - Missing minutes:', needsMinutes);
+
+      return {
+        success: false,
+        needs_clarification: false,
+        needs_reason: true,
+        type: parsed.type,
+        missing_minutes: needsMinutes,
+        error: 'Needs more details'
       };
     }
 
@@ -138,10 +366,9 @@ exports.logAbsenceFromSMS = async ({ employee, parsedData, originalMessage, phon
         ? `${parsedData.minutes_late || 'Unknown'} minutes late - ${parsedData.reason}`
         : parsedData.reason,
       expected_return: parsedData.expected_return ? new Date(parsedData.expected_return) : null,
-      call_time: callTime,
-      call_duration: 0,
-      call_transcript: originalMessage, // Store original SMS text
-      call_recording_url: null,
+      report_time: callTime,
+      report_method: 'sms',
+      report_message: originalMessage,
       points_awarded: pointsAwarded,
       late_notice: noticeCheck.isLateNotice,
       station_impacted: stationImpact.impacted

@@ -3,23 +3,22 @@ const router = express.Router();
 const Absence = require('../models/Absence');
 const Employee = require('../models/Employee');
 
-// Get call recording
-router.get('/:id/recording', async (req, res) => {
+// Get absence details
+router.get('/:id/details', async (req, res) => {
   try {
-    const absence = await Absence.findById(req.params.id);
+    const absence = await Absence.findById(req.params.id).populate('employee_id');
 
-    if (!absence || !absence.call_recording_url) {
-      return res.status(404).json({ success: false, error: 'Recording not found' });
+    if (!absence) {
+      return res.status(404).json({ success: false, error: 'Record not found' });
     }
 
-    // Redirect to recording URL (stored in Twilio/Vapi)
-    res.redirect(absence.call_recording_url);
+    res.json({ success: true, absence });
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
   }
 });
 
-// Get recent calls
+// Get recent reports
 router.get('/', async (req, res) => {
   try {
     const { limit = 20, employee_id } = req.query;
@@ -29,12 +28,12 @@ router.get('/', async (req, res) => {
       query.employee_id = employee_id;
     }
 
-    const calls = await Absence.find(query)
+    const absences = await Absence.find(query)
       .populate('employee_id')
-      .sort({ call_time: -1 })
+      .sort({ report_time: -1 })
       .limit(parseInt(limit));
 
-    res.json({ success: true, calls });
+    res.json({ success: true, absences });
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
   }
@@ -80,7 +79,8 @@ router.get('/debug/status', async (req, res) => {
         employee: a.employee_name,
         type: a.type,
         reason: a.reason,
-        call_time: a.call_time,
+        report_time: a.report_time,
+        report_method: a.report_method,
         created_at: a.created_at
       })),
       employees: employees.map(e => ({

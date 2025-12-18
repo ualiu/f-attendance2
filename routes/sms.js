@@ -52,10 +52,91 @@ router.post('/incoming', async (req, res) => {
 
       const twiml = new twilio.twiml.MessagingResponse();
 
-      if (parsedData.needs_clarification) {
-        twiml.message(`Hi ${employee.name}, I need a bit more info. Are you:\n1. Sick/Not feeling well\n2. Running late (how many minutes?)\n3. Taking a personal day\n\nPlease reply with more details.`);
+      if (parsedData.needs_reason) {
+        // Type is identified, but needs more details
+        if (parsedData.type === 'sick') {
+          twiml.message(`Hi ${employee.name}, got it - you can't come in due to illness.
+
+What's the specific reason?
+
+Examples:
+• "Flu"
+• "Fever and headache"
+• "Stomach bug"
+• "Doctor appointment"
+• "COVID symptoms"
+
+Please reply with the specific reason.`);
+        } else if (parsedData.type === 'late') {
+          if (parsedData.missing_minutes) {
+            twiml.message(`Hi ${employee.name}, got it - you're running late.
+
+How many minutes late AND what's the reason?
+
+Examples:
+• "30 min - traffic"
+• "15 minutes - car trouble"
+• "20 min - overslept"
+• "1 hour - bus delayed"
+
+Please reply with minutes and reason.`);
+          } else {
+            twiml.message(`Hi ${employee.name}, got it - you're running late.
+
+What's the specific reason?
+
+Examples:
+• "Traffic jam"
+• "Car won't start"
+• "Overslept"
+• "Train delayed"
+
+Please reply with the reason.`);
+          }
+        } else if (parsedData.type === 'personal') {
+          twiml.message(`Hi ${employee.name}, got it - you need a personal day.
+
+What's the specific reason?
+
+Examples:
+• "Family emergency"
+• "Child care issue"
+• "Court appearance"
+• "Car in shop"
+• "Appointment"
+
+Please reply with the reason.`);
+        }
+      } else if (parsedData.needs_clarification) {
+        twiml.message(`Hi ${employee.name}, I need more info about your absence.
+
+Please choose one and provide details:
+
+🤒 SICK
+Reply: "Sick - [reason]"
+Example: "Sick - flu"
+
+⏰ LATE
+Reply: "Late - [minutes] - [reason]"
+Example: "Late - 30 min - traffic"
+
+📅 PERSONAL DAY
+Reply: "Personal - [reason]"
+Example: "Personal - family emergency"
+
+Please reply with one of the formats above.`);
       } else {
-        twiml.message(`Hi ${employee.name}, I couldn't process that. Please text something like: "Sick today", "30 min late - traffic", or "Personal day"`);
+        twiml.message(`Hi ${employee.name}, I couldn't understand your message.
+
+Please use one of these formats:
+
+🤒 SICK: "Sick - flu" or "Not feeling well - fever"
+
+⏰ LATE: "30 min late - traffic" or "Running late - 15 min - overslept"
+
+📅 PERSONAL: "Personal day - appointment" or "Family emergency"
+
+Reply with more details so I can log your absence correctly.`);
       }
 
       res.type('text/xml');

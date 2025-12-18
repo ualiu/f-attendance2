@@ -97,11 +97,8 @@
                 <td><%= absence.reason %></td>
                 <td><%= absence.points_awarded %></td>
                 <td>
-                  <% if (absence.call_transcript) { %>
-                    <button onclick="viewTranscript('<%= absence._id %>')" class="btn-small">Transcript</button>
-                  <% } %>
-                  <% if (absence.call_recording_url) { %>
-                    <a href="<%= absence.call_recording_url %>" target="_blank" class="btn-small">Recording</a>
+                  <% if (absence.report_message) { %>
+                    <button onclick="viewMessage('<%= absence._id %>')" class="btn-small">View</button>
                   <% } %>
                 </td>
               </tr>

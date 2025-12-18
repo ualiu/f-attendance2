@@ -96,9 +96,9 @@
     <% } %>
 
     <!-- Recent Reports -->
-    <div class="recent-calls-section">
-      <h2>Recent Reports (SMS & Calls)</h2>
-      <table class="calls-table">
+    <div class="recent-absences-section">
+      <h2>Recent Absence Reports</h2>
+      <table class="absences-table">
         <thead>
           <tr>
             <th>Time</th>
@@ -111,29 +111,26 @@
           </tr>
         </thead>
         <tbody>
-          <% if (recentCalls.length === 0) { %>
+          <% if (recentAbsences.length === 0) { %>
             <tr>
               <td colspan="7" class="no-data">No recent reports</td>
             </tr>
           <% } else { %>
-            <% recentCalls.forEach(call => { %>
+            <% recentAbsences.forEach(absence => { %>
               <tr>
-                <td><%= call.call_time ? new Date(call.call_time).toLocaleString() : 'N/A' %></td>
+                <td><%= absence.report_time ? new Date(absence.report_time).toLocaleString() : 'N/A' %></td>
                 <td>
-                  <a href="/dashboard/employee/<%= call.employee_id?._id %>">
-                    <%= call.employee_name %>
+                  <a href="/dashboard/employee/<%= absence.employee_id?._id %>">
+                    <%= absence.employee_name %>
                   </a>
                 </td>
-                <td><span class="type-badge type-<%= call.type %>"><%= call.type %></span></td>
-                <td><%= call.reason %></td>
-                <td><%= call.work_station %></td>
-                <td><%= call.points_awarded %></td>
+                <td><span class="type-badge type-<%= absence.type %>"><%= absence.type %></span></td>
+                <td><%= absence.reason %></td>
+                <td><%= absence.work_station %></td>
+                <td><%= absence.points_awarded %></td>
                 <td>
-                  <% if (call.call_transcript) { %>
-                    <button onclick="viewTranscript('<%= call._id %>')" class="btn-small">View</button>
-                  <% } %>
-                  <% if (call.call_recording_url) { %>
-                    <a href="<%= call.call_recording_url %>" target="_blank" class="btn-small">Recording</a>
+                  <% if (absence.report_message) { %>
+                    <button onclick="viewMessage('<%= absence._id %>')" class="btn-small">View</button>
                   <% } %>
                 </td>
               </tr>

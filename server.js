@@ -26,8 +26,8 @@ app.set('views', path.join(__dirname, 'views'));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Log ALL incoming requests to /api/calls/*
-app.use('/api/calls', (req, res, next) => {
+// Log ALL incoming requests to /api/absences/*
+app.use('/api/absences', (req, res, next) => {
   console.log(`\n📥 INCOMING REQUEST TO ${req.method} ${req.path}`);
   console.log(`   Headers:`, req.headers);
   console.log(`   Body:`, req.body);
@@ -77,7 +77,7 @@ app.use('/', require('./routes/auth'));
 app.use('/admin', require('./routes/setup'));
 app.use('/dashboard', require('./routes/dashboard'));
 app.use('/api/employees', require('./routes/employees'));
-app.use('/api/calls', require('./routes/calls'));
+app.use('/api/absences', require('./routes/absences'));
 app.use('/api/sms', require('./routes/sms'));
 app.use('/reports', require('./routes/reports'));
 app.use('/test', require('./routes/test'));

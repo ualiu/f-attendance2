@@ -244,10 +244,10 @@ router.get('/create-test-call', async (req, res) => {
       work_station: employee.work_station || 'Test Station',
       date: new Date(),
       type: 'sick',
-      reason: 'Test call from VAPI - Flu symptoms',
-      call_time: new Date(),
-      call_duration: 145, // 2 minutes 25 seconds
-      call_transcript: 'AI: Hi, this is Felton Brushes. Who am I speaking with?\nEmployee: ' + employee.name + '\nAI: Hi ' + employee.name + '! Are you calling because you\'re sick or late?\nEmployee: I\'m sick\nAI: What\'s the reason?\nEmployee: I have the flu\nAI: I\'ve logged your absence. Feel better!',
+      reason: 'Test SMS - Flu symptoms',
+      report_time: new Date(),
+      report_method: 'sms',
+      report_message: 'Sick today - flu',
       points_awarded: 1.0,
       late_notice: false,
       station_impacted: true

@@ -33,20 +33,17 @@ const absenceSchema = new mongoose.Schema({
     default: null
   },
 
-  // Call details
-  call_time: {
+  // Report details (SMS or other contact method)
+  report_time: {
     type: Date,
     required: true
   },
-  call_duration: {
-    type: Number,
-    default: 0
-  },
-  call_recording_url: {
+  report_method: {
     type: String,
-    default: null
+    enum: ['sms', 'call', 'manual'],
+    default: 'sms'
   },
-  call_transcript: {
+  report_message: {
     type: String,
     default: null
   },
@@ -55,20 +52,6 @@ const absenceSchema = new mongoose.Schema({
   points_awarded: {
     type: Number,
     required: true
-  },
-
-  // AI insights
-  ai_notes: {
-    type: String,
-    default: null
-  },
-  coaching_offered: {
-    type: Boolean,
-    default: false
-  },
-  employee_response: {
-    type: String,
-    default: null
   },
 
   // Notifications

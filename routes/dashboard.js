@@ -21,10 +21,10 @@ router.get('/', async (req, res) => {
     // Get affected stations today
     const affectedStations = await attendanceService.getAffectedStationsToday();
 
-    // Get recent calls (last 10)
-    const recentCalls = await Absence.find({})
+    // Get recent absence reports (last 10)
+    const recentAbsences = await Absence.find({})
       .populate('employee_id')
-      .sort({ call_time: -1 })
+      .sort({ report_time: -1 })
       .limit(10);
 
     res.render('dashboard/index', {
@@ -32,7 +32,7 @@ router.get('/', async (req, res) => {
       todaysSummary,
       alertEmployees,
       affectedStations,
-      recentCalls
+      recentAbsences
     });
   } catch (error) {
     console.error('Error loading dashboard:', error);
