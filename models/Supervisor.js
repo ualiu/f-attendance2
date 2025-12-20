@@ -2,40 +2,39 @@ const mongoose = require('mongoose');
 const bcrypt = require('bcrypt');
 
 const supervisorSchema = new mongoose.Schema({
-  // Basic info from Google
-  google_id: {
-    type: String,
-    default: null
-  },
   email: {
     type: String,
     required: true,
-    unique: true
+    unique: true,
+    lowercase: true,
+    trim: true
   },
   name: {
     type: String,
     required: true
   },
-  profile_picture: {
-    type: String,
-    default: null
-  },
-
-  // Optional: Traditional login backup
   password_hash: {
     type: String,
-    default: null
+    required: true
   },
 
   // Role & permissions
   role: {
     type: String,
-    enum: ['admin', 'supervisor', 'manager'],
+    enum: ['super_admin', 'admin', 'supervisor', 'manager'],
     default: 'supervisor'
   },
   department: {
     type: String,
     default: null
+  },
+
+  // Multi-tenancy: Organization reference
+  organization_id: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Organization',
+    required: false, // Will be required after migration
+    index: true
   },
 
   // Access control
@@ -63,6 +62,20 @@ const supervisorSchema = new mongoose.Schema({
   },
   phone: {
     type: String,
+    default: null
+  },
+
+  // Admin invitation management
+  password_reset_required: {
+    type: Boolean,
+    default: false
+  },
+  invitation_token: {
+    type: String,
+    default: null
+  },
+  invitation_expires: {
+    type: Date,
     default: null
   },
 

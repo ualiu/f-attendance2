@@ -10,9 +10,13 @@ const absenceSchema = new mongoose.Schema({
     type: String,
     required: true
   },
-  work_station: {
-    type: String,
-    required: true
+
+  // Multi-tenancy: Organization reference
+  organization_id: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Organization',
+    required: false, // Will be required after migration
+    index: true
   },
 
   date: {
@@ -69,10 +73,6 @@ const absenceSchema = new mongoose.Schema({
     type: Boolean,
     default: false
   },
-  station_impacted: {
-    type: Boolean,
-    default: false
-  },
 
   created_at: {
     type: Date,
@@ -80,9 +80,8 @@ const absenceSchema = new mongoose.Schema({
   }
 });
 
-// Index for faster queries
-absenceSchema.index({ employee_id: 1, date: -1 });
-absenceSchema.index({ work_station: 1, date: -1 });
-absenceSchema.index({ date: -1 });
+// Compound indexes for tenant-scoped queries
+absenceSchema.index({ organization_id: 1, employee_id: 1, date: -1 });
+absenceSchema.index({ organization_id: 1, date: -1 });
 
 module.exports = mongoose.model('Absence', absenceSchema);

@@ -1,17 +1,18 @@
 const express = require('express');
 const router = express.Router();
-const { requireAuth } = require('../middleware/auth');
+const { requireTenantAuth } = require('../middleware/auth');
+const { scopeQuery, validateTenantAccess } = require('../utils/tenantHelper');
 const Employee = require('../models/Employee');
 const Absence = require('../models/Absence');
 const attendanceService = require('../services/attendanceService');
 
-// All employee routes require authentication
-router.use(requireAuth);
+// All employee routes require authentication + tenant scoping
+router.use(requireTenantAuth);
 
-// Get all employees
+// Get all employees (tenant-scoped)
 router.get('/', async (req, res) => {
   try {
-    const employees = await Employee.find({})
+    const employees = await Employee.find(scopeQuery(req.organizationId))
       .populate('supervisor_id')
       .sort({ name: 1 });
 
@@ -21,26 +22,25 @@ router.get('/', async (req, res) => {
   }
 });
 
-// Get single employee
+// Get single employee (tenant-scoped)
 router.get('/:id', async (req, res) => {
   try {
-    const employee = await Employee.findById(req.params.id)
-      .populate('supervisor_id');
-
-    if (!employee) {
-      return res.status(404).json({ success: false, error: 'Employee not found' });
-    }
+    const employee = await validateTenantAccess(Employee, req.params.id, req.organizationId);
+    await employee.populate('supervisor_id');
 
     res.json({ success: true, employee });
   } catch (error) {
+    if (error.message === 'Resource not found or access denied') {
+      return res.status(404).json({ success: false, error: 'Employee not found' });
+    }
     res.status(500).json({ success: false, error: error.message });
   }
 });
 
-// Create employee
+// Create employee (tenant-scoped)
 router.post('/', async (req, res) => {
   try {
-    const { employee_id, name, phone, department, shift, work_station } = req.body;
+    const { employee_id, name, phone, shift } = req.body;
 
     // Assign supervisor if authenticated user is a supervisor
     const supervisor_id = req.user._id;
@@ -49,10 +49,9 @@ router.post('/', async (req, res) => {
       employee_id,
       name,
       phone,
-      department,
       shift,
-      work_station: work_station || null,
       supervisor_id,
+      organization_id: req.organizationId, // CRITICAL: Assign to user's organization
       points_current_quarter: 0,
       absences_this_quarter: 0,
       tardies_this_quarter: 0,
@@ -65,7 +64,7 @@ router.post('/', async (req, res) => {
   }
 });
 
-// Update employee
+// Update employee (tenant-scoped)
 router.put('/:id', async (req, res) => {
   try {
     const updates = req.body;
@@ -75,9 +74,10 @@ router.put('/:id', async (req, res) => {
     delete updates.absences_this_quarter;
     delete updates.tardies_this_quarter;
     delete updates.status;
+    delete updates.organization_id; // Prevent changing organization
 
-    const employee = await Employee.findByIdAndUpdate(
-      req.params.id,
+    const employee = await Employee.findOneAndUpdate(
+      scopeQuery(req.organizationId, { _id: req.params.id }),
       updates,
       { new: true, runValidators: true }
     ).populate('supervisor_id');
@@ -92,10 +92,12 @@ router.put('/:id', async (req, res) => {
   }
 });
 
-// Delete employee
+// Delete employee (tenant-scoped)
 router.delete('/:id', async (req, res) => {
   try {
-    const employee = await Employee.findByIdAndDelete(req.params.id);
+    const employee = await Employee.findOneAndDelete(
+      scopeQuery(req.organizationId, { _id: req.params.id })
+    );
 
     if (!employee) {
       return res.status(404).json({ success: false, error: 'Employee not found' });
@@ -107,12 +109,15 @@ router.delete('/:id', async (req, res) => {
   }
 });
 
-// Get employee absences
+// Get employee absences (tenant-scoped)
 router.get('/:id/absences', async (req, res) => {
   try {
+    // First validate employee belongs to organization
+    await validateTenantAccess(Employee, req.params.id, req.organizationId);
+
     const { startDate, endDate } = req.query;
 
-    const query = { employee_id: req.params.id };
+    const query = scopeQuery(req.organizationId, { employee_id: req.params.id });
 
     if (startDate || endDate) {
       query.date = {};
@@ -126,14 +131,17 @@ router.get('/:id/absences', async (req, res) => {
 
     res.json({ success: true, absences });
   } catch (error) {
+    if (error.message === 'Resource not found or access denied') {
+      return res.status(404).json({ success: false, error: 'Employee not found' });
+    }
     res.status(500).json({ success: false, error: error.message });
   }
 });
 
-// Reset employee points (for new quarter)
+// Reset employee points (for new quarter) - tenant-scoped
 router.post('/:id/reset-points', async (req, res) => {
   try {
-    const employee = await Employee.findById(req.params.id);
+    const employee = await validateTenantAccess(Employee, req.params.id, req.organizationId);
 
     if (!employee) {
       return res.status(404).json({ success: false, error: 'Employee not found' });
@@ -152,7 +160,7 @@ router.post('/:id/reset-points', async (req, res) => {
   }
 });
 
-// Bulk import employees
+// Bulk import employees (tenant-scoped)
 router.post('/bulk-import', async (req, res) => {
   try {
     const { employees } = req.body;
@@ -161,20 +169,22 @@ router.post('/bulk-import', async (req, res) => {
       return res.status(400).json({ success: false, error: 'No employees provided' });
     }
 
-    // Assign supervisor
+    // Assign supervisor and organization
     const supervisor_id = req.user._id;
+    const organization_id = req.organizationId;
 
-    // Add supervisor to all employees
-    const employeesWithSupervisor = employees.map(emp => ({
+    // Add supervisor and organization_id to all employees
+    const employeesWithOrgAndSupervisor = employees.map(emp => ({
       ...emp,
       supervisor_id,
+      organization_id, // CRITICAL: Assign to user's organization
       points_current_quarter: 0,
       absences_this_quarter: 0,
       tardies_this_quarter: 0,
       status: 'good'
     }));
 
-    const created = await Employee.insertMany(employeesWithSupervisor);
+    const created = await Employee.insertMany(employeesWithOrgAndSupervisor);
 
     res.json({ success: true, count: created.length, employees: created });
   } catch (error) {

@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Invite Admin - Felton Brushes</title>
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <%- include('../partials/header') %>
+  <%- include('../partials/sidebar') %>
+
+  <main class="main-with-sidebar">
+    <h1>Admin Management</h1>
+    <p class="subtitle">Manage admin accounts for your organization</p>
+
+    <!-- Add Admin Button -->
+    <div style="margin-bottom: 2rem;">
+      <button onclick="showAddAdminModal()" class="btn btn-primary">+ Add Admin</button>
+    </div>
+
+    <!-- Admins List -->
+    <div class="card">
+      <h2>Current Admins</h2>
+      <div class="table-responsive">
+        <table class="data-table">
+        <thead>
+          <tr>
+            <th>Name</th>
+            <th>Email</th>
+            <th>Role</th>
+            <th>Status</th>
+            <th>Created</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% if (admins.length === 0) { %>
+            <tr>
+              <td colspan="6" class="no-data">No admins found</td>
+            </tr>
+          <% } else { %>
+            <% admins.forEach(admin => { %>
+              <tr>
+                <td><%= admin.name %></td>
+                <td><%= admin.email %></td>
+                <td>
+                  <span class="status-badge <%= admin.role === 'super_admin' ? 'status-good' : 'status-watch' %>">
+                    <%= admin.role === 'super_admin' ? 'Super Admin' : 'Admin' %>
+                  </span>
+                </td>
+                <td>
+                  <span class="status-badge <%= admin.is_active ? 'status-good' : 'status-review_required' %>">
+                    <%= admin.is_active ? 'Active' : 'Disabled' %>
+                  </span>
+                </td>
+                <td>
+                  <% if (admin.created_at) { %>
+                    <%= new Date(admin.created_at).toLocaleDateString() %>
+                  <% } else { %>
+                    N/A
+                  <% } %>
+                </td>
+                <td>
+                  <% if (admin.role !== 'super_admin') { %>
+                    <button onclick="removeAdmin('<%= admin._id %>')" class="btn-small btn-danger">
+                      Remove
+                    </button>
+                  <% } else { %>
+                    <span style="color: #999;">-</span>
+                  <% } %>
+                </td>
+              </tr>
+            <% }); %>
+          <% } %>
+        </tbody>
+      </table>
+      </div>
+    </div>
+  </main>
+
+  <!-- Add Admin Modal -->
+  <div id="addAdminModal" class="modal" style="display: none;">
+    <div class="modal-content">
+      <h2>Create Admin Account</h2>
+      <form id="inviteForm" onsubmit="addAdmin(event)">
+        <div class="form-group">
+          <label>Full Name</label>
+          <input type="text" name="name" required>
+        </div>
+
+        <div class="form-group">
+          <label>Email Address</label>
+          <input type="email" name="email" required>
+          <small style="color: #666; display: block; margin-top: 0.25rem;">
+            This will be used for login
+          </small>
+        </div>
+
+        <div class="form-group">
+          <label>Password</label>
+          <input type="password" name="password" required minlength="6">
+          <small style="color: #666; display: block; margin-top: 0.25rem;">
+            Minimum 6 characters. Share this with the admin securely.
+          </small>
+        </div>
+
+        <div class="modal-actions">
+          <button type="submit" class="btn btn-primary">Create Admin</button>
+          <button type="button" onclick="closeModal('addAdminModal')" class="btn btn-secondary">Cancel</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script>
+    function showAddAdminModal() {
+      document.getElementById('addAdminModal').style.display = 'flex';
+    }
+
+    function closeModal(modalId) {
+      document.getElementById(modalId).style.display = 'none';
+    }
+
+    async function addAdmin(e) {
+      e.preventDefault();
+
+      const formData = new FormData(e.target);
+      const data = {
+        name: formData.get('name'),
+        email: formData.get('email'),
+        password: formData.get('password')
+      };
+
+      try {
+        const response = await fetch('/admin/invite-admin', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(data)
+        });
+
+        const result = await response.json();
+
+        if (response.ok) {
+          alert(`✅ Admin account created successfully!\n\nEmail: ${result.admin.email}\n\nShare the login credentials with the admin securely.`);
+          closeModal('addAdminModal');
+          location.reload(); // Refresh to show new admin in list
+        } else {
+          alert('Error: ' + (result.error || 'Failed to create admin'));
+        }
+      } catch (error) {
+        alert('Error creating admin: ' + error.message);
+      }
+    }
+
+    async function removeAdmin(adminId) {
+      if (!confirm('Are you sure you want to remove this admin? They will no longer have access to the system.')) {
+        return;
+      }
+
+      try {
+        const response = await fetch(`/admin/remove-admin/${adminId}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' }
+        });
+
+        const result = await response.json();
+
+        if (response.ok) {
+          alert('Admin removed successfully');
+          location.reload();
+        } else {
+          alert('Error: ' + (result.error || 'Failed to remove admin'));
+        }
+      } catch (error) {
+        alert('Error removing admin: ' + error.message);
+      }
+    }
+
+    // Close modal when clicking outside
+    window.onclick = function(event) {
+      if (event.target.classList.contains('modal')) {
+        event.target.style.display = 'none';
+      }
+    }
+  </script>
+  <script src="/js/global.js"></script>
+</body>
+</html>

@@ -1,6 +1,13 @@
 const Employee = require('../models/Employee');
 const Absence = require('../models/Absence');
-const WorkStation = require('../models/WorkStation');
+
+// Helper to scope queries by organization
+const scopeQuery = (organizationId, baseQuery = {}) => {
+  if (!organizationId) {
+    throw new Error('organizationId is required for scoped queries');
+  }
+  return { ...baseQuery, organization_id: organizationId };
+};
 
 // Get the start of the current quarter
 const getQuarterStart = () => {
@@ -15,20 +22,20 @@ const getQuarterStart = () => {
 };
 
 // Calculate points for an employee
-exports.calculatePoints = async (employeeId) => {
+exports.calculatePoints = async (employeeId, organizationId) => {
   const quarterStart = getQuarterStart();
 
-  const absences = await Absence.find({
+  const absences = await Absence.find(scopeQuery(organizationId, {
     employee_id: employeeId,
     date: { $gte: quarterStart },
     type: { $in: ['sick', 'personal'] } // Exclude approved PTO
-  });
+  }));
 
-  const tardies = await Absence.find({
+  const tardies = await Absence.find(scopeQuery(organizationId, {
     employee_id: employeeId,
     date: { $gte: quarterStart },
     type: 'late'
-  });
+  }));
 
   const absencePoints = absences.length;
   const tardyPoints = Math.floor(tardies.length / 3);
@@ -45,30 +52,30 @@ exports.getStatus = (points) => {
 };
 
 // Update employee attendance stats
-exports.updateEmployeeStats = async (employeeId) => {
+exports.updateEmployeeStats = async (employeeId, organizationId) => {
   const quarterStart = getQuarterStart();
 
-  const employee = await Employee.findById(employeeId);
+  const employee = await Employee.findOne(scopeQuery(organizationId, { _id: employeeId }));
   if (!employee) {
     throw new Error('Employee not found');
   }
 
   // Count absences
-  const absences = await Absence.countDocuments({
+  const absences = await Absence.countDocuments(scopeQuery(organizationId, {
     employee_id: employeeId,
     date: { $gte: quarterStart },
     type: { $in: ['sick', 'personal'] }
-  });
+  }));
 
   // Count tardies
-  const tardies = await Absence.countDocuments({
+  const tardies = await Absence.countDocuments(scopeQuery(organizationId, {
     employee_id: employeeId,
     date: { $gte: quarterStart },
     type: 'late'
-  });
+  }));
 
   // Calculate points
-  const points = await this.calculatePoints(employeeId);
+  const points = await this.calculatePoints(employeeId, organizationId);
   const status = this.getStatus(points);
 
   // Update employee
@@ -110,31 +117,6 @@ exports.getShiftStartTime = (shift) => {
   return today;
 };
 
-// Check work station impact
-exports.checkStationImpact = async (workStationName) => {
-  if (!workStationName) {
-    return { impacted: false };
-  }
-
-  const station = await WorkStation.findOne({ name: workStationName })
-    .populate('primary_worker backup_workers');
-
-  if (!station) {
-    return { impacted: false };
-  }
-
-  const hasBackup = station.backup_workers && station.backup_workers.length > 0;
-  const isCritical = station.required_for_production;
-
-  return {
-    impacted: isCritical,
-    hasBackup,
-    isCritical,
-    station,
-    urgency: isCritical && !hasBackup ? 'high' : 'normal'
-  };
-};
-
 // Calculate points to award for an absence
 exports.calculatePointsToAward = (absenceType) => {
   switch (absenceType) {
@@ -151,18 +133,18 @@ exports.calculatePointsToAward = (absenceType) => {
 };
 
 // Get today's attendance summary
-exports.getTodaysSummary = async () => {
+exports.getTodaysSummary = async (organizationId) => {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
 
   const tomorrow = new Date(today);
   tomorrow.setDate(tomorrow.getDate() + 1);
 
-  const todaysAbsences = await Absence.find({
+  const todaysAbsences = await Absence.find(scopeQuery(organizationId, {
     date: { $gte: today, $lt: tomorrow }
-  }).populate('employee_id');
+  })).populate('employee_id');
 
-  const totalEmployees = await Employee.countDocuments();
+  const totalEmployees = await Employee.countDocuments(scopeQuery(organizationId));
   const absentCount = todaysAbsences.filter(a => a.type !== 'late').length;
   const lateCount = todaysAbsences.filter(a => a.type === 'late').length;
   const presentCount = totalEmployees - absentCount;
@@ -177,39 +159,10 @@ exports.getTodaysSummary = async () => {
 };
 
 // Get employees at risk
-exports.getAtRiskEmployees = async () => {
-  return await Employee.find({
+exports.getAtRiskEmployees = async (organizationId) => {
+  return await Employee.find(scopeQuery(organizationId, {
     status: { $in: ['at_risk', 'review_required'] }
-  }).sort({ points_current_quarter: -1 });
-};
-
-// Get affected stations today
-exports.getAffectedStationsToday = async () => {
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-
-  const tomorrow = new Date(today);
-  tomorrow.setDate(tomorrow.getDate() + 1);
-
-  const todaysAbsences = await Absence.find({
-    date: { $gte: today, $lt: tomorrow },
-    type: { $ne: 'late' }
-  }).populate('employee_id');
-
-  const stationNames = [...new Set(todaysAbsences.map(a => a.work_station))];
-
-  const stations = await WorkStation.find({
-    name: { $in: stationNames }
-  }).populate('primary_worker backup_workers');
-
-  return stations.map(station => {
-    const absencesForStation = todaysAbsences.filter(a => a.work_station === station.name);
-    return {
-      ...station.toObject(),
-      absences: absencesForStation,
-      status: station.required_for_production && station.backup_workers.length === 0 ? 'critical' : 'affected'
-    };
-  });
+  })).sort({ points_current_quarter: -1 });
 };
 
 module.exports = exports;

@@ -1,28 +1,25 @@
 const express = require('express');
 const router = express.Router();
-const { requireAuth } = require('../middleware/auth');
+const { requireTenantAuth } = require('../middleware/auth');
+const { scopeQuery, validateTenantAccess } = require('../utils/tenantHelper');
 const Employee = require('../models/Employee');
 const Absence = require('../models/Absence');
-const WorkStation = require('../models/WorkStation');
 const attendanceService = require('../services/attendanceService');
 
-// All dashboard routes require authentication
-router.use(requireAuth);
+// All dashboard routes require authentication + tenant scoping
+router.use(requireTenantAuth);
 
 // Main dashboard
 router.get('/', async (req, res) => {
   try {
-    // Get today's summary
-    const todaysSummary = await attendanceService.getTodaysSummary();
+    // Get today's summary (tenant-scoped)
+    const todaysSummary = await attendanceService.getTodaysSummary(req.organizationId);
 
-    // Get employees at risk
-    const alertEmployees = await attendanceService.getAtRiskEmployees();
+    // Get employees at risk (tenant-scoped)
+    const alertEmployees = await attendanceService.getAtRiskEmployees(req.organizationId);
 
-    // Get affected stations today
-    const affectedStations = await attendanceService.getAffectedStationsToday();
-
-    // Get recent absence reports (last 10)
-    const recentAbsences = await Absence.find({})
+    // Get recent absence reports (last 10, tenant-scoped)
+    const recentAbsences = await Absence.find(scopeQuery(req.organizationId))
       .populate('employee_id')
       .sort({ report_time: -1 })
       .limit(10);
@@ -31,7 +28,6 @@ router.get('/', async (req, res) => {
       title: 'Dashboard',
       todaysSummary,
       alertEmployees,
-      affectedStations,
       recentAbsences
     });
   } catch (error) {
@@ -40,50 +36,12 @@ router.get('/', async (req, res) => {
   }
 });
 
-// Work stations view
-router.get('/stations', async (req, res) => {
-  try {
-    const stations = await WorkStation.find({})
-      .populate('primary_worker backup_workers')
-      .sort({ line: 1, name: 1 });
-
-    // Get today's affected stations
-    const affectedStations = await attendanceService.getAffectedStationsToday();
-    const affectedStationIds = affectedStations.map(s => s._id.toString());
-
-    // Group stations by line
-    const stationsByLine = {};
-    stations.forEach(station => {
-      if (!stationsByLine[station.line]) {
-        stationsByLine[station.line] = [];
-      }
-
-      const stationObj = station.toObject();
-      stationObj.isAffectedToday = affectedStationIds.includes(station._id.toString());
-
-      stationsByLine[station.line].push(stationObj);
-    });
-
-    res.render('dashboard/stations', {
-      title: 'Work Stations',
-      stationsByLine,
-      affectedStations
-    });
-  } catch (error) {
-    console.error('Error loading stations:', error);
-    res.status(500).send('Server error');
-  }
-});
-
 // Employee detail view
 router.get('/employee/:id', async (req, res) => {
   try {
-    const employee = await Employee.findById(req.params.id)
-      .populate('supervisor_id');
-
-    if (!employee) {
-      return res.status(404).send('Employee not found');
-    }
+    // Validate employee belongs to organization
+    const employee = await validateTenantAccess(Employee, req.params.id, req.organizationId);
+    await employee.populate('supervisor_id');
 
     // Get all absences for this quarter
     const quarterStart = new Date();
@@ -94,23 +52,21 @@ router.get('/employee/:id', async (req, res) => {
     else quarterStart.setMonth(9, 1);
     quarterStart.setHours(0, 0, 0, 0);
 
-    const absences = await Absence.find({
+    const absences = await Absence.find(scopeQuery(req.organizationId, {
       employee_id: employee._id,
       date: { $gte: quarterStart }
-    }).sort({ date: -1 });
-
-    // Get work station info
-    const station = await WorkStation.findOne({ name: employee.work_station })
-      .populate('primary_worker backup_workers');
+    })).sort({ date: -1 });
 
     res.render('dashboard/employee', {
       title: `Employee: ${employee.name}`,
       employee,
       absences,
-      station,
       quarterStart
     });
   } catch (error) {
+    if (error.message === 'Resource not found or access denied') {
+      return res.status(404).send('Employee not found');
+    }
     console.error('Error loading employee:', error);
     res.status(500).send('Server error');
   }
@@ -119,15 +75,13 @@ router.get('/employee/:id', async (req, res) => {
 // API endpoint: Get dashboard data (for AJAX updates)
 router.get('/api/data', async (req, res) => {
   try {
-    const todaysSummary = await attendanceService.getTodaysSummary();
-    const alertEmployees = await attendanceService.getAtRiskEmployees();
-    const affectedStations = await attendanceService.getAffectedStationsToday();
+    const todaysSummary = await attendanceService.getTodaysSummary(req.organizationId);
+    const alertEmployees = await attendanceService.getAtRiskEmployees(req.organizationId);
 
     res.json({
       success: true,
       todaysSummary,
-      alertEmployees,
-      affectedStations
+      alertEmployees
     });
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });

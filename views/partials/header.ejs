@@ -4,7 +4,7 @@
       <button class="menu-toggle" onclick="toggleSidebar()" aria-label="Toggle menu">
         ☰
       </button>
-      <h1 class="logo">Felton Brushes</h1>
+      <h1 class="logo"><%= organization ? organization.name : 'Attendance System' %></h1>
       <span class="subtitle">Attendance Management</span>
     </div>
 
@@ -17,9 +17,14 @@
             <div class="user-avatar-placeholder"><%= user.name.charAt(0) %></div>
           <% } %>
           <span class="user-name"><%= user.name %></span>
-          <span class="user-role"><%= user.role %></span>
+          <% if (user.role === 'super_admin') { %>
+            <span class="user-role-badge super-admin">Super Admin</span>
+          <% } else if (user.role === 'admin') { %>
+            <span class="user-role-badge admin">Admin</span>
+          <% } else { %>
+            <span class="user-role"><%= user.role %></span>
+          <% } %>
         </div>
-        <a href="/logout" class="btn btn-secondary">Logout</a>
       <% } %>
     </div>
   </div>

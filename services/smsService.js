@@ -41,7 +41,7 @@ exports.parseAttendanceMessage = async (messageBody, employee) => {
 
 Employee: ${employee.name}
 Current Points: ${employee.points_current_quarter}
-Work Station: ${employee.work_station}
+Department: ${employee.department}
 Shift: ${employee.shift}
 
 MESSAGE TO PARSE:
@@ -451,8 +451,6 @@ exports.logAbsenceFromSMS = async ({ employee, parsedData, originalMessage, phon
       pointsAwarded = 1.0;
     }
 
-    const stationImpact = await attendanceService.checkStationImpact(employee.work_station);
-
     // Format reason with duration info
     let formattedReason = parsedData.reason || 'No reason provided';
     if (parsedData.type === 'late' && duration > 0) {
@@ -465,7 +463,6 @@ exports.logAbsenceFromSMS = async ({ employee, parsedData, originalMessage, phon
     const absence = await Absence.create({
       employee_id: employee._id,
       employee_name: employee.name,
-      work_station: employee.work_station,
       date: new Date(),
       type: absenceType,
       reason: formattedReason,
@@ -475,7 +472,7 @@ exports.logAbsenceFromSMS = async ({ employee, parsedData, originalMessage, phon
       report_message: originalMessage,
       points_awarded: pointsAwarded,
       late_notice: noticeCheck.isLateNotice,
-      station_impacted: stationImpact.impacted
+      organization_id: employee.organization_id // CRITICAL: Assign to employee's organization
     });
 
     console.log(`✅ ABSENCE SAVED FROM SMS:`);
@@ -486,7 +483,7 @@ exports.logAbsenceFromSMS = async ({ employee, parsedData, originalMessage, phon
     console.log(`   Points: ${pointsAwarded}`);
 
     // Update employee stats
-    await attendanceService.updateEmployeeStats(employee._id);
+    await attendanceService.updateEmployeeStats(employee._id, employee.organization_id);
 
     return absence;
 

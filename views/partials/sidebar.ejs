@@ -1,30 +1,31 @@
 <aside class="sidebar">
   <nav class="sidebar-nav">
-    <a href="/dashboard" class="sidebar-link">
-      <span class="icon">📊</span>
-      <span>Dashboard</span>
-    </a>
-
-    <a href="/dashboard/stations" class="sidebar-link">
-      <span class="icon">🏭</span>
-      <span>Work Stations</span>
-    </a>
-
-    <a href="/reports" class="sidebar-link">
-      <span class="icon">📈</span>
-      <span>Reports</span>
-    </a>
-
-    <a href="/admin/manage" class="sidebar-link">
-      <span class="icon">⚙️</span>
-      <span>Manage</span>
-    </a>
-
-    <% if (user && user.role === 'admin') { %>
-      <a href="/admin/users" class="sidebar-link">
-        <span class="icon">👥</span>
-        <span>Users</span>
+    <div class="sidebar-nav-main">
+      <a href="/dashboard" class="sidebar-link">
+        <span class="icon">📊</span>
+        <span class="link-text">Dashboard</span>
       </a>
-    <% } %>
+
+      <% if (user && (user.role === 'admin' || user.role === 'super_admin')) { %>
+        <a href="/admin/employees" class="sidebar-link">
+          <span class="icon">👥</span>
+          <span class="link-text">Employees</span>
+        </a>
+      <% } %>
+
+      <% if (user && user.role === 'super_admin') { %>
+        <a href="/admin/invite-admin" class="sidebar-link">
+          <span class="icon">➕</span>
+          <span class="link-text">Invite Admin</span>
+        </a>
+      <% } %>
+    </div>
+
+    <div class="sidebar-nav-bottom">
+      <a href="/logout" class="logout-btn">
+        <span class="icon">🚪</span>
+        <span class="btn-text">Logout</span>
+      </a>
+    </div>
   </nav>
 </aside>

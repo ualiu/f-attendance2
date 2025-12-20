@@ -64,23 +64,37 @@ app.use(passport.session());
 // Flash messages
 app.use(flash());
 
-// Make user available to all views
-app.use((req, res, next) => {
+// Make user and organization available to all views
+app.use(async (req, res, next) => {
   res.locals.user = req.user || null;
   res.locals.error = req.query.error || req.flash('error')[0] || null;
   res.locals.success = req.query.success || req.flash('success')[0] || null;
+
+  // Load organization if user is authenticated
+  if (req.user && req.user.organization_id) {
+    try {
+      const Organization = require('./models/Organization');
+      const organization = await Organization.findById(req.user.organization_id);
+      res.locals.organization = organization;
+    } catch (error) {
+      console.error('Error loading organization:', error);
+      res.locals.organization = null;
+    }
+  } else {
+    res.locals.organization = null;
+  }
+
   next();
 });
 
 // Routes
 app.use('/', require('./routes/auth'));
-app.use('/admin', require('./routes/setup'));
 app.use('/dashboard', require('./routes/dashboard'));
+app.use('/admin', require('./routes/admin'));
 app.use('/api/employees', require('./routes/employees'));
 app.use('/api/absences', require('./routes/absences'));
 app.use('/api/sms', require('./routes/sms'));
 app.use('/reports', require('./routes/reports'));
-app.use('/test', require('./routes/test'));
 
 // Root redirect
 app.get('/', (req, res) => {

@@ -26,7 +26,7 @@ body {
   font-size: 16px;
   line-height: 1.6;
   color: #333;
-  background-color: #f5f5f5;
+  background-color: #f8f4f0;
   overflow-x: hidden;
 }
 
@@ -140,8 +140,28 @@ a:hover {
   display: none;
 }
 
+.user-role-badge {
+  font-size: 0.7rem;
+  font-weight: 600;
+  padding: 0.25rem 0.5rem;
+  border-radius: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  display: none;
+}
+
+.user-role-badge.super-admin {
+  background-color: #28a745;
+  color: white;
+}
+
+.user-role-badge.admin {
+  background-color: #667eea;
+  color: white;
+}
+
 /* ===================================
-   SIDEBAR - COLLAPSIBLE ON MOBILE
+   SIDEBAR - COLLAPSIBLE ON ALL DEVICES
    =================================== */
 .sidebar {
   position: fixed;
@@ -151,9 +171,10 @@ a:hover {
   height: calc(100vh - var(--header-height));
   background-color: white;
   box-shadow: 2px 0 8px rgba(0,0,0,0.1);
-  transition: left 0.3s ease;
+  transition: all 0.3s ease;
   z-index: 900;
   overflow-y: auto;
+  overflow-x: hidden;
 }
 
 .sidebar.active {
@@ -161,7 +182,54 @@ a:hover {
 }
 
 .sidebar-nav {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
   padding: 1rem 0;
+  overflow: hidden;
+}
+
+.sidebar-nav-main {
+  flex: 1;
+  overflow-y: auto;
+}
+
+.sidebar-nav-bottom {
+  border-top: 1px solid #e0e0e0;
+  padding: 1rem;
+  flex-shrink: 0;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.logout-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  padding: 0.875rem 1.5rem;
+  background: transparent;
+  color: #333;
+  border: none;
+  border-radius: 8px;
+  font-size: 0.9rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+  text-decoration: none;
+}
+
+.logout-btn:hover {
+  background-color: #f0f0f0;
+}
+
+.logout-btn .icon {
+  font-size: 1.25rem;
+  width: 1.5rem;
+  text-align: center;
+  flex-shrink: 0;
 }
 
 .sidebar-link {
@@ -173,6 +241,7 @@ a:hover {
   text-decoration: none;
   transition: all 0.2s;
   border-left: 3px solid transparent;
+  white-space: nowrap;
 }
 
 .sidebar-link:hover {
@@ -192,7 +261,9 @@ a:hover {
   font-size: 1.25rem;
   width: 24px;
   text-align: center;
+  flex-shrink: 0;
 }
+
 
 /* Overlay for mobile */
 .sidebar-overlay {
@@ -397,12 +468,21 @@ a:hover {
 /* ===================================
    TABLE - RESPONSIVE WITH SCROLL
    =================================== */
+/* Table wrapper for horizontal scroll on mobile */
+.table-responsive {
+  width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  margin-bottom: 1rem;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+}
+
 .absences-table {
   width: 100%;
   border-collapse: collapse;
   font-size: 0.9rem;
-  overflow-x: auto;
-  display: block;
+  min-width: 600px;
 }
 
 .absences-table thead {
@@ -415,15 +495,31 @@ a:hover {
   font-weight: 600;
   color: var(--dark);
   white-space: nowrap;
+  border-bottom: 2px solid var(--border-color);
 }
 
 .absences-table td {
   padding: 0.75rem;
   border-bottom: 1px solid var(--border-color);
+  white-space: nowrap;
 }
 
 .absences-table tbody tr:hover {
   background-color: var(--light-gray);
+}
+
+/* Mobile scroll hint */
+@media (max-width: 767px) {
+  .table-responsive::after {
+    content: "← Scroll to see more →";
+    display: block;
+    text-align: center;
+    padding: 0.5rem;
+    font-size: 0.75rem;
+    color: #666;
+    background-color: #f8f9fa;
+    border-top: 1px solid var(--border-color);
+  }
 }
 
 .type-badge {
@@ -592,17 +688,14 @@ a:hover {
   .dashboard-header h1 {
     font-size: 2rem;
   }
-
-  .absences-table {
-    display: table;
-  }
 }
 
 /* ===================================
    DESKTOP BREAKPOINT (1024px+)
    =================================== */
 @media (min-width: 1024px) {
-  .user-role {
+  .user-role,
+  .user-role-badge {
     display: inline;
   }
 
@@ -776,8 +869,7 @@ a:hover {
   width: 100%;
   border-collapse: collapse;
   font-size: 0.9rem;
-  overflow-x: auto;
-  display: block;
+  min-width: 600px;
 }
 
 .data-table thead {
@@ -790,11 +882,13 @@ a:hover {
   font-weight: 600;
   color: var(--dark);
   white-space: nowrap;
+  border-bottom: 2px solid var(--border-color);
 }
 
 .data-table td {
   padding: 0.75rem;
   border-bottom: 1px solid var(--border-color);
+  white-space: nowrap;
 }
 
 .data-table tbody tr:hover {
@@ -818,10 +912,6 @@ a:hover {
 
   .employee-header h1 {
     font-size: 2rem;
-  }
-
-  .data-table {
-    display: table;
   }
 }
 
@@ -1035,10 +1125,6 @@ a:hover {
 
   .employee-header h1 {
     font-size: 2rem;
-  }
-
-  .data-table {
-    display: table;
   }
 
   .reports-grid {

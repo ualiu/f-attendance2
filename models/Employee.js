@@ -12,25 +12,46 @@ const employeeSchema = new mongoose.Schema({
   },
   phone: {
     type: String,
-    required: true
-  },
-  department: {
-    type: String,
-    required: true
-  },
-  work_station: {
-    type: String,
-    default: null
+    required: true,
+    unique: true,
+    trim: true
   },
   shift: {
     type: String,
     enum: ['Day', 'Night', 'Weekend'],
     required: true
   },
+
+  // Employee details
+  start_date: {
+    type: Date,
+    default: null
+  },
+  vacation_days_per_year: {
+    type: Number,
+    default: 0
+  },
+  sick_days_per_year: {
+    type: Number,
+    default: 0
+  },
+  flex_days_per_year: {
+    type: Number,
+    default: 0
+  },
+
   supervisor_id: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Supervisor',
     default: null
+  },
+
+  // Multi-tenancy: Organization reference
+  organization_id: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Organization',
+    required: false, // Will be required after migration
+    index: true
   },
 
   // Attendance tracking
@@ -67,5 +88,10 @@ employeeSchema.pre('save', function(next) {
   this.updated_at = Date.now();
   next();
 });
+
+// Compound indexes for tenant-scoped queries
+employeeSchema.index({ organization_id: 1, employee_id: 1 });
+employeeSchema.index({ organization_id: 1, phone: 1 });
+employeeSchema.index({ organization_id: 1, status: 1 });
 
 module.exports = mongoose.model('Employee', employeeSchema);

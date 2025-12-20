@@ -10,7 +10,11 @@
       "Bash(node scripts/check-absences.js:*)",
       "Bash(node scripts/verify-vapi-config.js:*)",
       "Bash(node -e:*)",
-      "Bash(node -c:*)"
+      "Bash(node -c:*)",
+      "Bash(node scripts/check-db-status.js:*)",
+      "Bash(grep:*)",
+      "Bash(node scripts/drop-username-index.js:*)",
+      "Bash(node scripts/add-phone-unique-index.js:*)"
     ],
     "deny": [],
     "ask": []

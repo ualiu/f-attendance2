@@ -5,40 +5,180 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Create Admin Account - Felton Brushes</title>
   <link rel="stylesheet" href="/css/style.css">
+  <style>
+    .setup-page {
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: #f8f4f0;
+      padding: 1rem;
+    }
+
+    .setup-container {
+      width: 100%;
+      max-width: 500px;
+    }
+
+    .setup-card {
+      background: white;
+      border-radius: 12px;
+      box-shadow: 0 10px 40px rgba(0, 0, 0, 0.15);
+      padding: 2.5rem;
+    }
+
+    .setup-card h1 {
+      font-size: 1.75rem;
+      color: #333;
+      margin: 0 0 0.5rem 0;
+      text-align: center;
+    }
+
+    .setup-card > p {
+      text-align: center;
+      color: #666;
+      margin: 0 0 2rem 0;
+      font-size: 0.95rem;
+    }
+
+    .admin-form {
+      margin-top: 0;
+    }
+
+    .form-group {
+      margin-bottom: 1.25rem;
+    }
+
+    .form-group label {
+      display: block;
+      font-weight: 600;
+      color: #333;
+      margin-bottom: 0.5rem;
+      font-size: 0.9rem;
+    }
+
+    .form-group input,
+    .form-group select {
+      width: 100%;
+      padding: 0.875rem;
+      border: 1px solid #ddd;
+      border-radius: 6px;
+      font-size: 1rem;
+      transition: border-color 0.2s;
+      box-sizing: border-box;
+    }
+
+    .form-group input:focus,
+    .form-group select:focus {
+      outline: none;
+      border-color: #667eea;
+    }
+
+    .form-group small {
+      color: #666;
+      display: block;
+      margin-top: 0.25rem;
+      font-size: 0.85rem;
+    }
+
+    .btn-primary {
+      width: 100%;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      padding: 0.875rem;
+      border: none;
+      border-radius: 6px;
+      font-size: 1rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: transform 0.2s, box-shadow 0.2s;
+      margin-top: 0.5rem;
+    }
+
+    .btn-primary:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+    }
+
+    .form-footer {
+      margin-top: 1.5rem;
+      text-align: center;
+      padding-top: 1.5rem;
+      border-top: 1px solid #eee;
+    }
+
+    .form-footer a {
+      color: #667eea;
+      text-decoration: none;
+      font-weight: 600;
+      font-size: 0.9rem;
+    }
+
+    .form-footer a:hover {
+      text-decoration: underline;
+    }
+
+    @media (max-width: 560px) {
+      .setup-card {
+        padding: 2rem 1.5rem;
+      }
+
+      .setup-card h1 {
+        font-size: 1.5rem;
+      }
+
+      .setup-card > p {
+        font-size: 0.85rem;
+      }
+
+      .form-group input,
+      .form-group select,
+      .btn-primary {
+        font-size: 0.95rem;
+      }
+    }
+
+    @media (max-width: 400px) {
+      .setup-card {
+        padding: 1.5rem 1rem;
+      }
+
+      .setup-card h1 {
+        font-size: 1.35rem;
+      }
+    }
+  </style>
 </head>
 <body class="setup-page">
   <div class="setup-container">
     <div class="setup-card">
       <h1>Create Administrator Account</h1>
-      <p>This is for initial setup only. Create the first admin account.</p>
+      <p>This is for initial setup only. Create your organization and first admin account.</p>
 
       <form action="/create-admin" method="POST" class="admin-form">
         <div class="form-group">
-          <label for="name">Full Name</label>
-          <input type="text" name="name" id="name" required>
+          <label for="organization_name">Organization Name</label>
+          <input type="text" name="organization_name" id="organization_name"
+                 placeholder="e.g., Felton Brushes" required>
+          <small>This will be your company name in the system</small>
+        </div>
+
+        <div class="form-group">
+          <label for="name">Your Full Name</label>
+          <input type="text" name="name" id="name" placeholder="John Doe" required>
         </div>
 
         <div class="form-group">
           <label for="email">Email</label>
-          <input type="email" name="email" id="email" required>
+          <input type="email" name="email" id="email" placeholder="admin@yourcompany.com" required>
         </div>
 
         <div class="form-group">
           <label for="password">Password</label>
-          <input type="password" name="password" id="password" required minlength="8">
+          <input type="password" name="password" id="password" placeholder="Min. 8 characters" required minlength="8">
         </div>
 
-        <div class="form-group">
-          <label for="department">Department</label>
-          <select name="department" id="department" required>
-            <option value="">Select Department</option>
-            <option value="Production">Production</option>
-            <option value="Maintenance">Maintenance</option>
-            <option value="Management">Management</option>
-          </select>
-        </div>
-
-        <button type="submit" class="btn btn-primary">Create Admin Account</button>
+        <button type="submit" class="btn-primary">Create Admin Account</button>
       </form>
 
       <div class="form-footer">

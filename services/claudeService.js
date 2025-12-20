@@ -1,123 +1,104 @@
 const Anthropic = require('@anthropic-ai/sdk');
 const Employee = require('../models/Employee');
 const Absence = require('../models/Absence');
-const WorkStation = require('../models/WorkStation');
 
 const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY
 });
 
+// Helper to scope queries by organization
+const scopeQuery = (organizationId, baseQuery = {}) => {
+  if (!organizationId) {
+    throw new Error('organizationId is required for scoped queries');
+  }
+  return { ...baseQuery, organization_id: organizationId };
+};
+
 // Generate individual employee report
-exports.generateEmployeeReport = async (employeeId, startDate, endDate) => {
-  // 1. Fetch employee data
-  const employee = await Employee.findById(employeeId)
+exports.generateEmployeeReport = async (employeeId, startDate, endDate, organizationId) => {
+  // 1. Fetch employee data (tenant-scoped)
+  const employee = await Employee.findOne(scopeQuery(organizationId, { _id: employeeId }))
     .populate('supervisor_id');
 
   if (!employee) {
     throw new Error('Employee not found');
   }
 
-  // 2. Fetch absences in date range
-  const absences = await Absence.find({
+  // 2. Fetch absences in date range (tenant-scoped)
+  const absences = await Absence.find(scopeQuery(organizationId, {
     employee_id: employeeId,
     date: { $gte: startDate, $lte: endDate }
-  }).sort({ date: -1 });
+  })).sort({ date: -1 });
 
-  // 3. Fetch work station data
-  const station = await WorkStation.findOne({
-    name: employee.work_station
-  }).populate('primary_worker backup_workers');
-
-  // 4. Build prompt for Claude
+  // 3. Build prompt for Claude
   const prompt = `
-Analyze this employee's attendance record and provide insights:
+Review this employee's attendance. Be direct and concise - no fluff.
 
 **EMPLOYEE:**
-Name: ${employee.name}
-Employee ID: ${employee.employee_id}
-Department: ${employee.department}
-Work Station: ${employee.work_station || 'Not assigned'}
+${employee.name} (${employee.employee_id})
 Shift: ${employee.shift}
-Current Points: ${employee.points_current_quarter}/6.0
-Status: ${employee.status}
+Started: ${employee.start_date ? new Date(employee.start_date).toLocaleDateString() : 'Unknown'}
+Benefits: ${employee.vacation_days_per_year || 0} vacation, ${employee.sick_days_per_year || 0} sick, ${employee.flex_days_per_year || 0} flex days
+Points: ${employee.points_current_quarter}/6.0 - Status: ${employee.status}
 
-**ABSENCES (${absences.length} total):**
-${absences.map(a => `
-- ${a.date.toDateString()}: ${a.type} (${a.reason})
-  Points: ${a.points_awarded}
-  ${a.coaching_offered ? 'Coaching offered: ' + a.employee_response : ''}
-`).join('\n')}
+**ABSENCES (${absences.length} this quarter):**
+${absences.map(a => `${a.date.toLocaleDateString()}: ${a.type} - ${a.reason} (${a.points_awarded} pts)`).join('\n')}
 
-**WORK STATION CONTEXT:**
-Station: ${station ? station.name : 'Not assigned'}
-Critical for production: ${station ? (station.required_for_production ? 'Yes' : 'No') : 'N/A'}
-Backup coverage: ${station ? station.backup_workers.length + ' backup(s)' : 'N/A'}
+**WHAT I NEED:**
 
-**ANALYSIS REQUIRED:**
+1. Quick summary (1-2 sentences max)
 
-1. **Summary**: Brief overview of attendance (2-3 sentences)
+2. Patterns to watch:
+   - List only if you see clear patterns (Monday/Friday trends, clustering, timing issues)
+   - Skip this if no real patterns
 
-2. **Pattern Detection**: Identify any concerning patterns:
-   - Day-of-week patterns (e.g., frequent Monday/Friday absences)
-   - Pre/post-holiday patterns
-   - Timing patterns (always calls in late, etc.)
-   - Clustering (multiple absences in short period)
+3. Risk level: Low, Medium, or High
+   - Will they hit 6 points soon?
+   - Any red flags?
 
-3. **Work Station Impact**: How have these absences affected production?
+4. What to do next:
+   - Talk to them? About what specifically?
+   - Any action needed now?
+   - If everything's fine, just say that
 
-4. **Risk Assessment**:
-   - Current risk level (low/medium/high)
-   - Likelihood of reaching termination threshold
-   - Any red flags
-
-5. **Recommendations**: Specific, actionable recommendations for supervisor:
-   - Should they schedule a conversation?
-   - Any support that might help?
-   - Cross-training needs?
-   - Policy enforcement needed?
-
-Format as a professional management report.
+Keep it short and practical. Use simple words. Skip the corporate speak.
   `;
 
-  // 5. Call Claude API
+  // 5. Call Claude API (using same model as SMS service for consistency)
   const message = await anthropic.messages.create({
-    model: 'claude-sonnet-4-20250514',
+    model: 'claude-opus-4-5-20251101',
     max_tokens: 2000,
     messages: [{ role: 'user', content: prompt }]
   });
 
-  // 6. Return formatted report
+  // 5. Return formatted report
   return {
     employee,
     absences,
-    station,
     analysis: message.content[0].text,
     generated_at: new Date()
   };
 };
 
 // Generate team report
-exports.generateTeamReport = async (supervisorId, startDate, endDate) => {
-  // 1. Get all employees under this supervisor
-  const employees = await Employee.find({
+exports.generateTeamReport = async (supervisorId, startDate, endDate, organizationId) => {
+  // 1. Get all employees under this supervisor (tenant-scoped)
+  const employees = await Employee.find(scopeQuery(organizationId, {
     supervisor_id: supervisorId
-  }).sort({ points_current_quarter: -1 });
+  })).sort({ points_current_quarter: -1 });
 
-  // If no supervisor assigned, get all employees
-  const allEmployees = employees.length > 0 ? employees : await Employee.find({}).sort({ points_current_quarter: -1 });
+  // If no supervisor assigned, get all employees in organization
+  const allEmployees = employees.length > 0 ? employees :
+    await Employee.find(scopeQuery(organizationId)).sort({ points_current_quarter: -1 });
 
-  // 2. Get all absences for these employees
+  // 2. Get all absences for these employees (tenant-scoped)
   const employeeIds = allEmployees.map(e => e._id);
-  const absences = await Absence.find({
+  const absences = await Absence.find(scopeQuery(organizationId, {
     employee_id: { $in: employeeIds },
     date: { $gte: startDate, $lte: endDate }
-  });
+  }));
 
-  // 3. Get work station data
-  const stations = await WorkStation.find({})
-    .populate('primary_worker backup_workers');
-
-  // 4. Calculate statistics
+  // 3. Calculate statistics
   const stats = {
     total_employees: allEmployees.length,
     total_absences: absences.length,
@@ -126,21 +107,9 @@ exports.generateTeamReport = async (supervisorId, startDate, endDate) => {
     good_standing: allEmployees.filter(e => e.status === 'good').length
   };
 
-  // Station impact analysis
-  const stationImpact = stations.map(station => {
-    const stationAbsences = absences.filter(a =>
-      a.work_station === station.name
-    );
-    return {
-      station: station.name,
-      days_down: stationAbsences.length,
-      has_backup: station.backup_workers.length > 0
-    };
-  }).sort((a, b) => b.days_down - a.days_down);
-
-  // 5. Build prompt for Claude
+  // 4. Build prompt for Claude
   const prompt = `
-Analyze this team's attendance for the department:
+Analyze this team's attendance:
 
 **TEAM OVERVIEW:**
 Total Employees: ${stats.total_employees}
@@ -152,12 +121,7 @@ Good Standing: ${stats.good_standing}
 **TOP EMPLOYEES BY POINTS:**
 ${allEmployees.slice(0, 10).map(e => `
 - ${e.name} (${e.employee_id}): ${e.points_current_quarter} points, ${e.absences_this_quarter} absences
-  Status: ${e.status}, Station: ${e.work_station || 'Not assigned'}
-`).join('\n')}
-
-**WORK STATION IMPACT:**
-${stationImpact.slice(0, 5).map(s => `
-- ${s.station}: ${s.days_down} days down, ${s.has_backup ? 'HAS backup' : '⚠️ NO backup'}
+  Status: ${e.status}, Shift: ${e.shift}
 `).join('\n')}
 
 **ANALYSIS REQUIRED:**
@@ -166,109 +130,24 @@ ${stationImpact.slice(0, 5).map(s => `
 
 2. **Priority Concerns**: Top 3-5 issues requiring immediate attention
 
-3. **Station Coverage**: Which stations need backup workers or cross-training?
+3. **Trends**: Any team-wide patterns or concerns?
 
-4. **Trends**: Any department-wide patterns or concerns?
-
-5. **Action Items**: Specific recommendations for supervisor (prioritized)
+4. **Action Items**: Specific recommendations for supervisor (prioritized)
 
 Format as a concise management report suitable for quick review.
   `;
 
-  // 6. Call Claude API
+  // 5. Call Claude API (using same model as SMS service for consistency)
   const message = await anthropic.messages.create({
-    model: 'claude-sonnet-4-20250514',
+    model: 'claude-opus-4-5-20251101',
     max_tokens: 2000,
     messages: [{ role: 'user', content: prompt }]
   });
 
-  // 7. Return formatted report
+  // 6. Return formatted report
   return {
     stats,
     employees: allEmployees,
-    stationImpact,
-    analysis: message.content[0].text,
-    generated_at: new Date()
-  };
-};
-
-// Generate work station downtime report
-exports.generateStationReport = async (department, startDate, endDate) => {
-  // 1. Get all stations for department
-  const stations = await WorkStation.find({ department })
-    .populate('primary_worker backup_workers');
-
-  // If no department specified, get all stations
-  const allStations = stations.length > 0 ? stations : await WorkStation.find({}).populate('primary_worker backup_workers');
-
-  // 2. Get absences affecting these stations
-  const stationNames = allStations.map(s => s.name);
-  const absences = await Absence.find({
-    work_station: { $in: stationNames },
-    date: { $gte: startDate, $lte: endDate }
-  }).populate('employee_id');
-
-  // 3. Calculate station metrics
-  const stationMetrics = allStations.map(station => {
-    const stationAbsences = absences.filter(a =>
-      a.work_station === station.name
-    );
-
-    return {
-      name: station.name,
-      days_down: stationAbsences.length,
-      primary_worker: station.primary_worker?.name || 'Unassigned',
-      primary_absence_rate: station.primary_worker ?
-        (stationAbsences.filter(a =>
-          a.employee_id?._id?.toString() === station.primary_worker._id.toString()
-        ).length / (stationAbsences.length || 1) * 100) : 0,
-      backup_count: station.backup_workers.length,
-      critical: station.required_for_production,
-      absences: stationAbsences
-    };
-  }).sort((a, b) => b.days_down - a.days_down);
-
-  // 4. Build prompt for Claude
-  const prompt = `
-Analyze work station downtime for ${department || 'all'} department(s):
-
-**STATIONS RANKED BY DOWNTIME:**
-${stationMetrics.map((s, idx) => `
-${idx + 1}. ${s.name}
-   Days Down: ${s.days_down}
-   Primary Worker: ${s.primary_worker}
-   Backup Coverage: ${s.backup_count} worker(s)
-   Critical for Production: ${s.critical ? 'YES ⚠️' : 'No'}
-   Primary Worker Absence Rate: ${s.primary_absence_rate.toFixed(1)}%
-`).join('\n')}
-
-**ANALYSIS REQUIRED:**
-
-1. **Overview**: Summary of station reliability (2-3 sentences)
-
-2. **Critical Gaps**: Identify stations with high risk:
-   - High downtime + no backup = URGENT
-   - Critical stations with single point of failure
-   - Stations where primary worker is frequently absent
-
-3. **Recommendations**:
-   - Which stations need backup workers assigned?
-   - Cross-training opportunities
-   - Should any primary assignments be reconsidered?
-   - Any production planning implications?
-
-Format as an operational report for production management.
-  `;
-
-  // 5. Call Claude API
-  const message = await anthropic.messages.create({
-    model: 'claude-sonnet-4-20250514',
-    max_tokens: 2000,
-    messages: [{ role: 'user', content: prompt }]
-  });
-
-  return {
-    stationMetrics,
     analysis: message.content[0].text,
     generated_at: new Date()
   };

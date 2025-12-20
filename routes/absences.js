@@ -1,19 +1,24 @@
 const express = require('express');
 const router = express.Router();
+const { requireTenantAuth } = require('../middleware/auth');
+const { scopeQuery, validateTenantAccess } = require('../utils/tenantHelper');
 const Absence = require('../models/Absence');
 const Employee = require('../models/Employee');
+
+// All absence routes require authentication + tenant scoping
+router.use(requireTenantAuth);
 
 // Get absence details
 router.get('/:id/details', async (req, res) => {
   try {
-    const absence = await Absence.findById(req.params.id).populate('employee_id');
-
-    if (!absence) {
-      return res.status(404).json({ success: false, error: 'Record not found' });
-    }
+    const absence = await validateTenantAccess(Absence, req.params.id, req.organizationId);
+    await absence.populate('employee_id');
 
     res.json({ success: true, absence });
   } catch (error) {
+    if (error.message === 'Resource not found or access denied') {
+      return res.status(404).json({ success: false, error: 'Record not found' });
+    }
     res.status(500).json({ success: false, error: error.message });
   }
 });
@@ -28,7 +33,7 @@ router.get('/', async (req, res) => {
       query.employee_id = employee_id;
     }
 
-    const absences = await Absence.find(query)
+    const absences = await Absence.find(scopeQuery(req.organizationId, query))
       .populate('employee_id')
       .sort({ report_time: -1 })
       .limit(parseInt(limit));
@@ -42,30 +47,30 @@ router.get('/', async (req, res) => {
 // Get specific absence/call by ID
 router.get('/:id', async (req, res) => {
   try {
-    const absence = await Absence.findById(req.params.id).populate('employee_id');
-
-    if (!absence) {
-      return res.status(404).json({ success: false, error: 'Record not found' });
-    }
+    const absence = await validateTenantAccess(Absence, req.params.id, req.organizationId);
+    await absence.populate('employee_id');
 
     res.json({ success: true, absence });
   } catch (error) {
+    if (error.message === 'Resource not found or access denied') {
+      return res.status(404).json({ success: false, error: 'Record not found' });
+    }
     res.status(500).json({ success: false, error: error.message });
   }
 });
 
-// Debug endpoint - check database status
+// Debug endpoint - check database status (tenant-scoped)
 router.get('/debug/status', async (req, res) => {
   try {
-    const absenceCount = await Absence.countDocuments();
-    const employeeCount = await Employee.countDocuments();
+    const absenceCount = await Absence.countDocuments(scopeQuery(req.organizationId));
+    const employeeCount = await Employee.countDocuments(scopeQuery(req.organizationId));
 
-    const recentAbsences = await Absence.find({})
+    const recentAbsences = await Absence.find(scopeQuery(req.organizationId))
       .sort({ created_at: -1 })
       .limit(10)
       .lean();
 
-    const employees = await Employee.find({}).lean();
+    const employees = await Employee.find(scopeQuery(req.organizationId)).lean();
 
     res.json({
       success: true,

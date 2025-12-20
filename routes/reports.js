@@ -1,107 +1,43 @@
 const express = require('express');
 const router = express.Router();
-const { requireAuth } = require('../middleware/auth');
+const { requireTenantAuth } = require('../middleware/auth');
 const claudeService = require('../services/claudeService');
-const Employee = require('../models/Employee');
 
-// All report routes require authentication
-router.use(requireAuth);
+// All report routes require authentication + tenant scoping
+router.use(requireTenantAuth);
 
-// Show reports page
-router.get('/', async (req, res) => {
+// Generate individual employee report (used from employee profile page)
+router.get('/employee', async (req, res) => {
   try {
-    const employees = await Employee.find({})
-      .sort({ name: 1 });
+    const { employeeId, startDate, endDate } = req.query;
 
-    res.render('reports/index', {
-      title: 'Generate Reports',
-      employees,
-      report: null
-    });
-  } catch (error) {
-    console.error('Error loading reports page:', error);
-    res.status(500).send('Server error');
-  }
-});
+    // Default to current quarter if no dates provided
+    const today = new Date();
+    const quarterStart = new Date(today.getFullYear(), Math.floor(today.getMonth() / 3) * 3, 1);
+    const quarterEnd = new Date(today.getFullYear(), Math.floor(today.getMonth() / 3) * 3 + 3, 0);
 
-// Generate individual employee report
-router.post('/employee', async (req, res) => {
-  try {
-    const { employeeId, startDate, endDate } = req.body;
+    const finalStartDate = startDate ? new Date(startDate) : quarterStart;
+    const finalEndDate = endDate ? new Date(endDate) : quarterEnd;
 
-    if (!employeeId || !startDate || !endDate) {
-      return res.status(400).send('Missing required fields');
+    if (!employeeId) {
+      return res.status(400).send('Employee ID is required');
     }
 
     const report = await claudeService.generateEmployeeReport(
       employeeId,
-      new Date(startDate),
-      new Date(endDate)
+      finalStartDate,
+      finalEndDate,
+      req.organizationId
     );
 
     res.render('reports/employee-report', {
       title: 'Employee Report',
       report,
-      startDate,
-      endDate
+      startDate: finalStartDate.toISOString().split('T')[0],
+      endDate: finalEndDate.toISOString().split('T')[0]
     });
   } catch (error) {
     console.error('Error generating employee report:', error);
-    res.status(500).send('Error generating report: ' + error.message);
-  }
-});
-
-// Generate team report
-router.post('/team', async (req, res) => {
-  try {
-    const { startDate, endDate } = req.body;
-
-    if (!startDate || !endDate) {
-      return res.status(400).send('Missing required fields');
-    }
-
-    const report = await claudeService.generateTeamReport(
-      req.user._id, // supervisor ID
-      new Date(startDate),
-      new Date(endDate)
-    );
-
-    res.render('reports/team-report', {
-      title: 'Team Report',
-      report,
-      startDate,
-      endDate
-    });
-  } catch (error) {
-    console.error('Error generating team report:', error);
-    res.status(500).send('Error generating report: ' + error.message);
-  }
-});
-
-// Generate station report
-router.post('/stations', async (req, res) => {
-  try {
-    const { department, startDate, endDate } = req.body;
-
-    if (!startDate || !endDate) {
-      return res.status(400).send('Missing required fields');
-    }
-
-    const report = await claudeService.generateStationReport(
-      department || null,
-      new Date(startDate),
-      new Date(endDate)
-    );
-
-    res.render('reports/station-report', {
-      title: 'Station Downtime Report',
-      report,
-      department,
-      startDate,
-      endDate
-    });
-  } catch (error) {
-    console.error('Error generating station report:', error);
     res.status(500).send('Error generating report: ' + error.message);
   }
 });

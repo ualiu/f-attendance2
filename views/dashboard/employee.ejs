@@ -44,29 +44,37 @@
       </div>
 
       <div class="stat-card">
-        <h3>Work Station</h3>
+        <h3>Shift</h3>
         <div class="stat-value" style="font-size: 1.2rem;">
-          <%= employee.work_station || 'Not assigned' %>
+          <%= employee.shift %>
         </div>
       </div>
     </div>
 
-    <% if (station) { %>
-      <div class="section">
-        <h2>Work Station Details</h2>
-        <div style="background: white; padding: 1.5rem; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
-          <p><strong>Station:</strong> <%= station.name %></p>
-          <p><strong>Critical:</strong> <%= station.required_for_production ? 'Yes' : 'No' %></p>
-          <p><strong>Backup Coverage:</strong>
-            <% if (station.backup_workers && station.backup_workers.length > 0) { %>
-              <%= station.backup_workers.length %> worker(s)
-            <% } else { %>
-              <span class="text-warning">None</span>
-            <% } %>
-          </p>
+    <!-- Employee Details -->
+    <div class="section">
+      <h2>Employee Information</h2>
+      <div style="background: white; padding: 1.5rem; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem;">
+          <div>
+            <strong>Start Date:</strong><br>
+            <%= employee.start_date ? new Date(employee.start_date).toLocaleDateString() : 'Not set' %>
+          </div>
+          <div>
+            <strong>Vacation Days/Year:</strong><br>
+            <%= employee.vacation_days_per_year || 'Not set' %>
+          </div>
+          <div>
+            <strong>Sick Days/Year:</strong><br>
+            <%= employee.sick_days_per_year || 'Not set' %>
+          </div>
+          <div>
+            <strong>Flex Days/Year:</strong><br>
+            <%= employee.flex_days_per_year || 'Not set' %>
+          </div>
         </div>
       </div>
-    <% } %>
+    </div>
 
     <div class="section">
       <div class="section-header">
@@ -74,7 +82,8 @@
         <small style="color: #666;">Starting <%= quarterStart.toLocaleDateString() %></small>
       </div>
 
-      <table class="data-table">
+      <div class="table-responsive">
+        <table class="data-table">
         <thead>
           <tr>
             <th>Date</th>
@@ -106,6 +115,7 @@
           <% } %>
         </tbody>
       </table>
+      </div>
     </div>
 
     <div class="quick-actions">

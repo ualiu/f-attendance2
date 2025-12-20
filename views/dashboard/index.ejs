@@ -52,7 +52,7 @@
                 <a href="/dashboard/employee/<%= emp._id %>" class="employee-name">
                   <%= emp.name %>
                 </a>
-                <span class="employee-station"><%= emp.work_station || 'No station' %></span>
+                <span class="employee-station"><%= emp.department %> - <%= emp.shift %></span>
               </div>
               <div class="alert-points">
                 <span class="points"><%= emp.points_current_quarter %> / 6.0 pts</span>
@@ -64,48 +64,17 @@
       </div>
     <% } %>
 
-    <!-- Affected Stations Today -->
-    <% if (affectedStations.length > 0) { %>
-      <div class="stations-section">
-        <h2>Affected Work Stations Today (<%= affectedStations.length %>)</h2>
-        <div class="station-list">
-          <% affectedStations.forEach(station => { %>
-            <div class="station-item station-<%= station.status %>">
-              <div class="station-name">
-                <%= station.name %>
-                <% if (station.status === 'critical') { %>
-                  <span class="badge badge-critical">CRITICAL</span>
-                <% } %>
-              </div>
-              <div class="station-details">
-                <% if (station.absences && station.absences.length > 0) { %>
-                  <% station.absences.forEach(absence => { %>
-                    <div class="absence-info">
-                      <%= absence.employee_name %> - <%= absence.type %>
-                    </div>
-                  <% }); %>
-                <% } %>
-                <div class="backup-info">
-                  Backup coverage: <%= station.backup_workers.length %> worker(s)
-                </div>
-              </div>
-            </div>
-          <% }); %>
-        </div>
-      </div>
-    <% } %>
-
     <!-- Recent Reports -->
     <div class="recent-absences-section">
       <h2>Recent Absence Reports</h2>
-      <table class="absences-table">
+      <div class="table-responsive">
+        <table class="absences-table">
         <thead>
           <tr>
             <th>Time</th>
             <th>Employee</th>
             <th>Type</th>
             <th>Reason</th>
-            <th>Station</th>
             <th>Points</th>
             <th>Actions</th>
           </tr>
@@ -113,7 +82,7 @@
         <tbody>
           <% if (recentAbsences.length === 0) { %>
             <tr>
-              <td colspan="7" class="no-data">No recent reports</td>
+              <td colspan="6" class="no-data">No recent reports</td>
             </tr>
           <% } else { %>
             <% recentAbsences.forEach(absence => { %>
@@ -126,7 +95,6 @@
                 </td>
                 <td><span class="type-badge type-<%= absence.type %>"><%= absence.type %></span></td>
                 <td><%= absence.reason %></td>
-                <td><%= absence.work_station %></td>
                 <td><%= absence.points_awarded %></td>
                 <td>
                   <% if (absence.report_message) { %>
@@ -138,6 +106,7 @@
           <% } %>
         </tbody>
       </table>
+      </div>
     </div>
   </main>
 
