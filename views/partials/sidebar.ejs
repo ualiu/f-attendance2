@@ -19,6 +19,13 @@
           <span class="link-text">Invite Admin</span>
         </a>
       <% } %>
+
+      <% if (user && (user.role === 'admin' || user.role === 'super_admin')) { %>
+        <a href="/reports" class="sidebar-link">
+          <span class="icon">📈</span>
+          <span class="link-text">Reports</span>
+        </a>
+      <% } %>
     </div>
 
     <div class="sidebar-nav-bottom">

@@ -59,6 +59,56 @@ router.get('/:id', async (req, res) => {
   }
 });
 
+// Create manual absence (admin only)
+router.post('/', async (req, res) => {
+  try {
+    const { employee_id, type, reason, date } = req.body;
+
+    // Validate required fields
+    if (!employee_id || !type || !reason) {
+      return res.status(400).json({
+        success: false,
+        error: 'Missing required fields: employee_id, type, reason'
+      });
+    }
+
+    // Validate employee belongs to organization
+    const employee = await validateTenantAccess(Employee, employee_id, req.organizationId);
+
+    // Create absence record
+    const absence = await Absence.create({
+      employee_id: employee._id,
+      employee_name: employee.name,
+      organization_id: req.organizationId,
+      date: date ? new Date(date) : new Date(),
+      type,
+      reason,
+      report_time: new Date(),
+      report_method: 'manual',
+      report_message: null,
+      late_notice: false
+    });
+
+    console.log(`✅ MANUAL ABSENCE LOGGED:`);
+    console.log(`   Employee: ${employee.name}`);
+    console.log(`   Type: ${type}`);
+    console.log(`   Reason: ${reason}`);
+    console.log(`   Logged by: ${req.user.name || req.user.email}`);
+
+    res.json({
+      success: true,
+      absence,
+      message: 'Absence logged successfully'
+    });
+  } catch (error) {
+    if (error.message === 'Resource not found or access denied') {
+      return res.status(404).json({ success: false, error: 'Employee not found' });
+    }
+    console.error('Error creating manual absence:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
 // Debug endpoint - check database status (tenant-scoped)
 router.get('/debug/status', async (req, res) => {
   try {
@@ -92,7 +142,7 @@ router.get('/debug/status', async (req, res) => {
         id: e._id,
         name: e.name,
         phone: e.phone,
-        points: e.points_current_quarter
+        shift: e.shift
       }))
     });
   } catch (error) {

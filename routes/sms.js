@@ -3,6 +3,7 @@ const router = express.Router();
 const twilio = require('twilio');
 const Employee = require('../models/Employee');
 const Absence = require('../models/Absence');
+const Organization = require('../models/Organization');
 const smsService = require('../services/smsService');
 
 // Twilio webhook for incoming SMS
@@ -42,6 +43,10 @@ router.post('/incoming', async (req, res) => {
 
     console.log('   ✅ Employee found:', employee.name);
 
+    // Load organization
+    const organization = await Organization.findById(employee.organization_id);
+    const organizationName = organization ? organization.name : 'your company';
+
     // Check if this is a follow-up message (conversation already active)
     const isFollowUp = smsService.isFollowUpMessage(phoneNumber);
     console.log('   🔄 Is follow-up message:', isFollowUp);
@@ -50,7 +55,7 @@ router.post('/incoming', async (req, res) => {
     smsService.markConversationActive(phoneNumber);
 
     // Parse the SMS message using Claude LLM
-    const parsedData = await smsService.parseAttendanceMessage(messageBody, employee);
+    const parsedData = await smsService.parseAttendanceMessage(messageBody, employee, organizationName);
 
     console.log('   📋 Parsed data:', parsedData);
 

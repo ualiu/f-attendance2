@@ -15,9 +15,6 @@ router.get('/', async (req, res) => {
     // Get today's summary (tenant-scoped)
     const todaysSummary = await attendanceService.getTodaysSummary(req.organizationId);
 
-    // Get employees at risk (tenant-scoped)
-    const alertEmployees = await attendanceService.getAtRiskEmployees(req.organizationId);
-
     // Get recent absence reports (last 10, tenant-scoped)
     const recentAbsences = await Absence.find(scopeQuery(req.organizationId))
       .populate('employee_id')
@@ -27,7 +24,6 @@ router.get('/', async (req, res) => {
     res.render('dashboard/index', {
       title: 'Dashboard',
       todaysSummary,
-      alertEmployees,
       recentAbsences
     });
   } catch (error) {
@@ -76,12 +72,10 @@ router.get('/employee/:id', async (req, res) => {
 router.get('/api/data', async (req, res) => {
   try {
     const todaysSummary = await attendanceService.getTodaysSummary(req.organizationId);
-    const alertEmployees = await attendanceService.getAtRiskEmployees(req.organizationId);
 
     res.json({
       success: true,
-      todaysSummary,
-      alertEmployees
+      todaysSummary
     });
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });

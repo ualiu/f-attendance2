@@ -21,3 +21,21 @@ document.addEventListener('DOMContentLoaded', function() {
     });
   });
 });
+
+// Format absence type names for display
+function formatAbsenceType(type) {
+  const typeMap = {
+    // SMS-based (automated)
+    'sick': 'Sick',
+    'late': 'Late',
+    'personal': 'Personal',
+    // Manual incidents (5 core edge cases)
+    'no_sms_no_show': 'No SMS, No Show',
+    'late_sms_no_show': 'Late SMS, No Show',
+    'left_early_no_permission': 'Left Early, No Permission',
+    'left_early_permission': 'Left Early with Permission',
+    'late_in_no_sms': 'Late In, No SMS'
+  };
+
+  return typeMap[type] || type.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+}

@@ -15,39 +15,8 @@
       <div>
         <h1><%= employee.name %></h1>
         <p class="employee-meta">
-          <%= employee.employee_id %> | <%= employee.department %> | <%= employee.shift %>
+          <%= employee.employee_id %> | <%= employee.shift %>
         </p>
-      </div>
-      <div>
-        <span class="status-badge status-<%= employee.status %>" style="font-size: 1.1rem; padding: 0.5rem 1rem;">
-          <%= employee.status.replace('_', ' ') %>
-        </span>
-      </div>
-    </div>
-
-    <div class="stats-grid" style="margin: 2rem 0;">
-      <div class="stat-card">
-        <h3>Points This Quarter</h3>
-        <div class="stat-value" style="color: <%= employee.points_current_quarter >= 6 ? '#dc3545' : employee.points_current_quarter >= 4 ? '#ffc107' : '#28a745' %>;">
-          <%= employee.points_current_quarter %> / 6.0
-        </div>
-      </div>
-
-      <div class="stat-card">
-        <h3>Absences</h3>
-        <div class="stat-value"><%= employee.absences_this_quarter %></div>
-      </div>
-
-      <div class="stat-card">
-        <h3>Tardies</h3>
-        <div class="stat-value"><%= employee.tardies_this_quarter %></div>
-      </div>
-
-      <div class="stat-card">
-        <h3>Shift</h3>
-        <div class="stat-value" style="font-size: 1.2rem;">
-          <%= employee.shift %>
-        </div>
       </div>
     </div>
 
@@ -57,22 +26,61 @@
       <div style="background: white; padding: 1.5rem; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
         <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem;">
           <div>
+            <strong>Employee ID:</strong><br>
+            <%= employee.employee_id %>
+          </div>
+          <div>
+            <strong>Shift:</strong><br>
+            <%= employee.shift %>
+          </div>
+          <div>
+            <strong>Phone:</strong><br>
+            <%= employee.phone %>
+          </div>
+          <div>
             <strong>Start Date:</strong><br>
             <%= employee.start_date ? new Date(employee.start_date).toLocaleDateString() : 'Not set' %>
           </div>
-          <div>
-            <strong>Vacation Days/Year:</strong><br>
-            <%= employee.vacation_days_per_year || 'Not set' %>
-          </div>
-          <div>
-            <strong>Sick Days/Year:</strong><br>
-            <%= employee.sick_days_per_year || 'Not set' %>
-          </div>
-          <div>
-            <strong>Flex Days/Year:</strong><br>
-            <%= employee.flex_days_per_year || 'Not set' %>
-          </div>
         </div>
+      </div>
+    </div>
+
+    <!-- Manual Absence Logging -->
+    <div class="section">
+      <h2>Log Manual Absence</h2>
+      <div style="background: white; padding: 1.5rem; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+        <form id="manualAbsenceForm" style="display: grid; gap: 1rem;">
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 1rem;">
+            <div class="form-group">
+              <label for="absenceType"><strong>Incident Type *</strong></label>
+              <select id="absenceType" name="type" required style="width: 100%; padding: 0.5rem; border: 1px solid #ddd; border-radius: 4px;">
+                <option value="">Select incident type...</option>
+                <option value="no_sms_no_show">No SMS, No Show</option>
+                <option value="late_sms_no_show">Late SMS, No Show</option>
+                <option value="left_early_no_permission">Left Early, No Permission</option>
+                <option value="left_early_permission">Left Early with Permission</option>
+                <option value="late_in_no_sms">Late In, No SMS</option>
+              </select>
+            </div>
+
+            <div class="form-group">
+              <label for="absenceDate"><strong>Date *</strong></label>
+              <input type="date" id="absenceDate" name="date" required style="width: 100%; padding: 0.5rem; border: 1px solid #ddd; border-radius: 4px;" value="<%= new Date().toISOString().split('T')[0] %>">
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label for="absenceReason"><strong>Reason/Notes *</strong></label>
+            <textarea id="absenceReason" name="reason" required rows="3" placeholder="Enter reason or additional notes..." style="width: 100%; padding: 0.5rem; border: 1px solid #ddd; border-radius: 4px; font-family: inherit;"></textarea>
+          </div>
+
+          <div>
+            <button type="submit" class="btn btn-primary">Log Absence</button>
+            <button type="reset" class="btn btn-secondary">Clear Form</button>
+          </div>
+
+          <div id="formMessage" style="display: none; padding: 1rem; border-radius: 4px; margin-top: 0.5rem;"></div>
+        </form>
       </div>
     </div>
 
@@ -89,14 +97,13 @@
             <th>Date</th>
             <th>Type</th>
             <th>Reason</th>
-            <th>Points</th>
             <th>Actions</th>
           </tr>
         </thead>
         <tbody>
           <% if (absences.length === 0) { %>
             <tr>
-              <td colspan="5" class="no-data">No absences this quarter</td>
+              <td colspan="4" class="no-data">No absences this quarter</td>
             </tr>
           <% } else { %>
             <% absences.forEach(absence => { %>
@@ -104,7 +111,6 @@
                 <td><%= new Date(absence.date).toLocaleDateString() %></td>
                 <td><span class="type-badge type-<%= absence.type %>"><%= absence.type %></span></td>
                 <td><%= absence.reason %></td>
-                <td><%= absence.points_awarded %></td>
                 <td>
                   <% if (absence.report_message) { %>
                     <button onclick="viewMessage('<%= absence._id %>')" class="btn-small">View</button>
@@ -125,6 +131,7 @@
   </main>
 
   <script src="/js/dashboard.js"></script>
+  <script src="/js/global.js"></script>
   <script>
     // Toggle sidebar for mobile
     function toggleSidebar() {
@@ -140,6 +147,74 @@
         if (window.innerWidth < 768) {
           toggleSidebar();
         }
+      });
+    });
+
+    // Manual absence form submission
+    document.getElementById('manualAbsenceForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+
+      const formData = {
+        employee_id: '<%= employee._id %>',
+        type: document.getElementById('absenceType').value,
+        date: document.getElementById('absenceDate').value,
+        reason: document.getElementById('absenceReason').value
+      };
+
+      const messageDiv = document.getElementById('formMessage');
+      const submitBtn = e.target.querySelector('button[type="submit"]');
+
+      // Disable submit button
+      submitBtn.disabled = true;
+      submitBtn.textContent = 'Logging...';
+
+      try {
+        const response = await fetch('/api/absences', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(formData)
+        });
+
+        const data = await response.json();
+
+        if (data.success) {
+          messageDiv.style.display = 'block';
+          messageDiv.style.background = '#d4edda';
+          messageDiv.style.color = '#155724';
+          messageDiv.style.border = '1px solid #c3e6cb';
+          messageDiv.textContent = '✅ Absence logged successfully!';
+
+          // Reset form
+          e.target.reset();
+          document.getElementById('absenceDate').value = '<%= new Date().toISOString().split('T')[0] %>';
+
+          // Reload page after 1 second to show new absence in table
+          setTimeout(() => {
+            window.location.reload();
+          }, 1000);
+        } else {
+          throw new Error(data.error || 'Failed to log absence');
+        }
+      } catch (error) {
+        messageDiv.style.display = 'block';
+        messageDiv.style.background = '#f8d7da';
+        messageDiv.style.color = '#721c24';
+        messageDiv.style.border = '1px solid #f5c6cb';
+        messageDiv.textContent = '❌ Error: ' + error.message;
+
+        // Re-enable submit button
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Log Absence';
+      }
+    });
+
+    // Format absence type badges on page load
+    document.addEventListener('DOMContentLoaded', function() {
+      document.querySelectorAll('.type-badge').forEach(badge => {
+        const rawType = badge.textContent.trim();
+        badge.textContent = formatAbsenceType(rawType);
       });
     });
   </script>

@@ -35,14 +35,13 @@ exports.markConversationActive = (phoneNumber) => {
 };
 
 // Parse attendance message using Claude
-exports.parseAttendanceMessage = async (messageBody, employee) => {
+exports.parseAttendanceMessage = async (messageBody, employee, organizationName = 'your company') => {
   try {
-    const prompt = `You are an attendance assistant for Felton Brushes manufacturing. Parse employee messages naturally and extract key information. Be EXTREMELY flexible and forgiving - employees text quickly and informally.
+    const prompt = `You are an attendance assistant for ${organizationName}. Parse employee messages naturally and extract key information. Be EXTREMELY flexible and forgiving - employees text quickly and informally.
 
 Employee: ${employee.name}
-Current Points: ${employee.points_current_quarter}
-Department: ${employee.department}
 Shift: ${employee.shift}
+Started: ${employee.start_date ? new Date(employee.start_date).toLocaleDateString() : 'Unknown'}
 
 MESSAGE TO PARSE:
 "${messageBody}"
@@ -432,23 +431,19 @@ exports.logAbsenceFromSMS = async ({ employee, parsedData, originalMessage, phon
     const callTime = new Date();
     const noticeCheck = attendanceService.checkNoticeTime(employee, callTime);
 
-    let pointsAwarded = 0;
     let absenceType = 'sick'; // Database type field
     const duration = parsedData.duration_minutes || 0;
 
-    // Calculate points based on duration and type
+    // Classify based on duration
     if (parsedData.type === 'late') {
-      // < 2 hours late = 0.33 points (tardiness)
+      // < 2 hours late
       absenceType = 'late';
-      pointsAwarded = 0.33;
     } else if (parsedData.type === 'half_day') {
-      // 2-4 hours = 0.5 points (half day absence)
+      // 2-4 hours = half day absence
       absenceType = parsedData.subtype || 'personal'; // Use subtype (sick/personal)
-      pointsAwarded = 0.5;
     } else if (parsedData.type === 'full_day') {
-      // 4+ hours or full day = 1.0 point
+      // 4+ hours or full day
       absenceType = parsedData.subtype || 'sick'; // Use subtype (sick/personal)
-      pointsAwarded = 1.0;
     }
 
     // Format reason with duration info
@@ -470,7 +465,6 @@ exports.logAbsenceFromSMS = async ({ employee, parsedData, originalMessage, phon
       report_time: callTime,
       report_method: 'sms',
       report_message: originalMessage,
-      points_awarded: pointsAwarded,
       late_notice: noticeCheck.isLateNotice,
       organization_id: employee.organization_id // CRITICAL: Assign to employee's organization
     });
@@ -480,10 +474,6 @@ exports.logAbsenceFromSMS = async ({ employee, parsedData, originalMessage, phon
     console.log(`   Employee: ${employee.name}`);
     console.log(`   Type: ${absenceType} (${parsedData.type})`);
     console.log(`   Duration: ${duration} minutes`);
-    console.log(`   Points: ${pointsAwarded}`);
-
-    // Update employee stats
-    await attendanceService.updateEmployeeStats(employee._id, employee.organization_id);
 
     return absence;
 
@@ -495,11 +485,6 @@ exports.logAbsenceFromSMS = async ({ employee, parsedData, originalMessage, phon
 
 // Generate response message
 exports.generateResponseMessage = async (employee, absence, parsedData) => {
-  // Refresh employee to get updated points
-  const Employee = require('../models/Employee');
-  const updatedEmployee = await Employee.findById(employee._id);
-
-  const points = updatedEmployee.points_current_quarter;
   const duration = parsedData.duration_minutes || 0;
 
   let message = `Got it, ${employee.name}. `;
@@ -507,38 +492,15 @@ exports.generateResponseMessage = async (employee, absence, parsedData) => {
   // Confirm what was logged
   if (parsedData.type === 'late') {
     const mins = duration > 0 ? `${duration} min` : 'late';
-    message += `Logged as late (${mins}). `;
+    message += `Logged as late (${mins}). ✅`;
   } else if (parsedData.type === 'half_day') {
     const hours = duration > 0 ? `${Math.round(duration / 60 * 10) / 10} hours` : 'half day';
     const typeLabel = parsedData.subtype === 'sick' ? 'sick (half day)' : 'personal (half day)';
-    message += `Logged as ${typeLabel} (${hours}). `;
+    message += `Logged as ${typeLabel} (${hours}). ✅`;
   } else if (parsedData.type === 'full_day') {
     const typeLabel = parsedData.subtype === 'sick' ? 'sick' : 'personal day';
-    message += `Logged as ${typeLabel}. `;
+    message += `Logged as ${typeLabel}. ✅`;
   }
-
-  // Only show status when it matters (not for low points)
-  const shouldShowStatus = points >= 2.5; // Show when getting close to watch threshold
-
-  if (shouldShowStatus) {
-    message += `You now have ${points} points. `;
-  }
-
-  // Status messages - only show when important
-  if (points >= 6) {
-    message += `🚨 FORMAL REVIEW REQUIRED - You've reached the 6-point threshold. A formal review meeting will be scheduled. Please speak with your supervisor.`;
-  } else if (points >= 5) {
-    message += `⚠️ CRITICAL - You're at ${points} points. One more absence will trigger a formal review.`;
-  } else if (points >= 4) {
-    message += `⚠️ AT RISK - You're at ${points} points. Please be very mindful of attendance.`;
-  } else if (points >= 3.5) {
-    message += `⚠️ WARNING - You're at ${points} points and approaching the at-risk threshold (4 points).`;
-  } else if (points >= 3) {
-    message += `⚠️ WATCH - You've reached ${points} points. Please be mindful of attendance.`;
-  } else if (points >= 2.5) {
-    message += `You're approaching the 3-point watch threshold.`;
-  }
-  // If points < 2.5, don't show any status - they're doing fine!
 
   return message;
 };

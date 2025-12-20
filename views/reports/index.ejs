@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title><%= title %></title>
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <%- include('../partials/header') %>
+  <%- include('../partials/sidebar') %>
+
+  <main class="main-with-sidebar">
+    <h1>Absence Reports & Analytics</h1>
+    <p class="subtitle">View and analyze absence trends over time</p>
+
+    <!-- Filters -->
+    <div class="card" style="margin-bottom: 2rem;">
+      <h2>Filters</h2>
+      <form method="GET" action="/reports" id="filterForm">
+        <div class="form-row" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-bottom: 1rem;">
+          <!-- Date Range Preset -->
+          <div class="form-group">
+            <label>Date Range</label>
+            <select name="range" id="rangeSelect" onchange="toggleCustomDates()">
+              <option value="today" <%= filters.range === 'today' ? 'selected' : '' %>>Today</option>
+              <option value="week" <%= filters.range === 'week' ? 'selected' : '' %>>Last 7 Days</option>
+              <option value="month" <%= filters.range === 'month' ? 'selected' : '' %>>This Month</option>
+              <option value="quarter" <%= filters.range === 'quarter' ? 'selected' : '' %>>This Quarter</option>
+              <option value="year" <%= filters.range === 'year' ? 'selected' : '' %>>This Year</option>
+              <option value="custom" <%= filters.range === 'custom' ? 'selected' : '' %>>Custom Range</option>
+            </select>
+          </div>
+
+          <!-- Custom Date Range -->
+          <div class="form-group" id="customDates" style="<%= filters.range === 'custom' ? '' : 'display: none;' %>">
+            <label>Start Date</label>
+            <input type="date" name="startDate" value="<%= filters.startDate %>">
+          </div>
+
+          <div class="form-group" id="customDatesEnd" style="<%= filters.range === 'custom' ? '' : 'display: none;' %>">
+            <label>End Date</label>
+            <input type="date" name="endDate" value="<%= filters.endDate %>">
+          </div>
+
+          <!-- Employee Filter -->
+          <div class="form-group">
+            <label>Employee</label>
+            <select name="employee">
+              <option value="">All Employees</option>
+              <% employees.forEach(emp => { %>
+                <option value="<%= emp._id %>" <%= filters.employee === emp._id.toString() ? 'selected' : '' %>>
+                  <%= emp.name %>
+                </option>
+              <% }); %>
+            </select>
+          </div>
+
+          <!-- Type Filter -->
+          <div class="form-group">
+            <label>Type</label>
+            <select name="type">
+              <option value="">All Types</option>
+              <optgroup label="SMS-Based (Automated)">
+                <option value="sick" <%= filters.type === 'sick' ? 'selected' : '' %>>Sick</option>
+                <option value="late" <%= filters.type === 'late' ? 'selected' : '' %>>Late</option>
+                <option value="personal" <%= filters.type === 'personal' ? 'selected' : '' %>>Personal</option>
+              </optgroup>
+              <optgroup label="Manual Incidents">
+                <option value="no_sms_no_show" <%= filters.type === 'no_sms_no_show' ? 'selected' : '' %>>No SMS, No Show</option>
+                <option value="late_sms_no_show" <%= filters.type === 'late_sms_no_show' ? 'selected' : '' %>>Late SMS, No Show</option>
+                <option value="left_early_no_permission" <%= filters.type === 'left_early_no_permission' ? 'selected' : '' %>>Left Early, No Permission</option>
+                <option value="left_early_permission" <%= filters.type === 'left_early_permission' ? 'selected' : '' %>>Left Early with Permission</option>
+                <option value="late_in_no_sms" <%= filters.type === 'late_in_no_sms' ? 'selected' : '' %>>Late In, No SMS</option>
+              </optgroup>
+            </select>
+          </div>
+        </div>
+
+        <button type="submit" class="btn btn-primary">Apply Filters</button>
+        <a href="/reports" class="btn btn-secondary">Reset</a>
+      </form>
+    </div>
+
+    <!-- Statistics -->
+    <div class="stats-grid" style="margin-bottom: 2rem;">
+      <div class="stat-card">
+        <div class="stat-value"><%= stats.total %></div>
+        <div class="stat-label">Total Absences</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value"><%= stats.sick %></div>
+        <div class="stat-label">Sick</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value"><%= stats.personal %></div>
+        <div class="stat-label">Personal</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value"><%= stats.late %></div>
+        <div class="stat-label">Late</div>
+      </div>
+    </div>
+
+    <!-- Timeline View -->
+    <div class="card">
+      <h2>Absence Timeline</h2>
+      <% if (absences.length === 0) { %>
+        <p style="text-align: center; color: #666; padding: 2rem;">No absences found for the selected period</p>
+      <% } else { %>
+        <div class="table-responsive">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Date</th>
+                <th>Employee</th>
+                <th>Type</th>
+                <th>Reason</th>
+                <th>Method</th>
+              </tr>
+            </thead>
+            <tbody>
+              <% absences.forEach(absence => { %>
+                <tr>
+                  <td><%= new Date(absence.date).toLocaleDateString() %></td>
+                  <td>
+                    <% if (absence.employee_id) { %>
+                      <a href="/dashboard/employee/<%= absence.employee_id._id %>">
+                        <%= absence.employee_name %>
+                      </a>
+                    <% } else { %>
+                      <%= absence.employee_name %>
+                    <% } %>
+                  </td>
+                  <td><span class="type-badge type-<%= absence.type %>"><%= absence.type %></span></td>
+                  <td><%= absence.reason %></td>
+                  <td><%= absence.report_method || 'N/A' %></td>
+                </tr>
+              <% }); %>
+            </tbody>
+          </table>
+        </div>
+      <% } %>
+    </div>
+  </main>
+
+  <script src="/js/global.js"></script>
+  <script>
+    function toggleCustomDates() {
+      const range = document.getElementById('rangeSelect').value;
+      const customDates = document.getElementById('customDates');
+      const customDatesEnd = document.getElementById('customDatesEnd');
+
+      if (range === 'custom') {
+        customDates.style.display = 'block';
+        customDatesEnd.style.display = 'block';
+      } else {
+        customDates.style.display = 'none';
+        customDatesEnd.style.display = 'none';
+      }
+    }
+
+    // Format absence type badges on page load
+    document.addEventListener('DOMContentLoaded', function() {
+      document.querySelectorAll('.type-badge').forEach(badge => {
+        const rawType = badge.textContent.trim();
+        badge.textContent = formatAbsenceType(rawType);
+      });
+    });
+  </script>
+</body>
+</html>

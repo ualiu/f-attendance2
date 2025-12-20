@@ -30,15 +30,13 @@
             <th>Name</th>
             <th>Employee ID</th>
             <th>Shift</th>
-            <th>Points</th>
-            <th>Status</th>
             <th>Actions</th>
           </tr>
         </thead>
         <tbody id="employeeTableBody">
           <% if (employees.length === 0) { %>
             <tr>
-              <td colspan="6" class="no-data">No employees yet. Add your first employee above.</td>
+              <td colspan="4" class="no-data">No employees yet. Add your first employee above.</td>
             </tr>
           <% } else { %>
             <% employees.forEach(emp => { %>
@@ -46,8 +44,6 @@
                 <td><a href="/dashboard/employee/<%= emp._id %>"><%= emp.name %></a></td>
                 <td><%= emp.employee_id %></td>
                 <td><%= emp.shift %></td>
-                <td><%= emp.points_current_quarter %> / 6.0</td>
-                <td><span class="status-badge status-<%= emp.status %>"><%= emp.status %></span></td>
                 <td>
                   <button onclick="editEmployee('<%= emp._id %>')" class="btn-small">Edit</button>
                   <button onclick="deleteEmployee('<%= emp._id %>')" class="btn-small btn-danger">Delete</button>
@@ -89,18 +85,6 @@
           <label>Start Date</label>
           <input type="date" name="start_date">
         </div>
-        <div class="form-group">
-          <label>Vacation Days/Year</label>
-          <input type="number" name="vacation_days_per_year" min="0" placeholder="e.g., 15">
-        </div>
-        <div class="form-group">
-          <label>Sick Days/Year</label>
-          <input type="number" name="sick_days_per_year" min="0" placeholder="e.g., 10">
-        </div>
-        <div class="form-group">
-          <label>Flex Days/Year</label>
-          <input type="number" name="flex_days_per_year" min="0" placeholder="e.g., 5">
-        </div>
         <div class="modal-actions">
           <button type="submit" class="btn btn-primary">Add Employee</button>
           <button type="button" onclick="closeModal('addEmployeeModal')" class="btn btn-secondary">Cancel</button>
@@ -139,18 +123,6 @@
         <div class="form-group">
           <label>Start Date</label>
           <input type="date" name="start_date" id="edit_start_date">
-        </div>
-        <div class="form-group">
-          <label>Vacation Days/Year</label>
-          <input type="number" name="vacation_days_per_year" id="edit_vacation_days_per_year" min="0">
-        </div>
-        <div class="form-group">
-          <label>Sick Days/Year</label>
-          <input type="number" name="sick_days_per_year" id="edit_sick_days_per_year" min="0">
-        </div>
-        <div class="form-group">
-          <label>Flex Days/Year</label>
-          <input type="number" name="flex_days_per_year" id="edit_flex_days_per_year" min="0">
         </div>
         <div class="modal-actions">
           <button type="submit" class="btn btn-primary">Update Employee</button>
@@ -238,12 +210,7 @@
       document.getElementById('edit_employee_code').value = employee.employee_id;
       document.getElementById('edit_phone').value = employee.phone;
       document.getElementById('edit_shift').value = employee.shift;
-
-      // Populate new fields
       document.getElementById('edit_start_date').value = employee.start_date ? new Date(employee.start_date).toISOString().split('T')[0] : '';
-      document.getElementById('edit_vacation_days_per_year').value = employee.vacation_days_per_year || '';
-      document.getElementById('edit_sick_days_per_year').value = employee.sick_days_per_year || '';
-      document.getElementById('edit_flex_days_per_year').value = employee.flex_days_per_year || '';
 
       // Show modal
       document.getElementById('editEmployeeModal').style.display = 'flex';

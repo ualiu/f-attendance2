@@ -9,86 +9,6 @@ const scopeQuery = (organizationId, baseQuery = {}) => {
   return { ...baseQuery, organization_id: organizationId };
 };
 
-// Get the start of the current quarter
-const getQuarterStart = () => {
-  const now = new Date();
-  const month = now.getMonth();
-  const year = now.getFullYear();
-
-  if (month < 3) return new Date(year, 0, 1); // Jan 1
-  if (month < 6) return new Date(year, 3, 1); // Apr 1
-  if (month < 9) return new Date(year, 6, 1); // Jul 1
-  return new Date(year, 9, 1); // Oct 1
-};
-
-// Calculate points for an employee
-exports.calculatePoints = async (employeeId, organizationId) => {
-  const quarterStart = getQuarterStart();
-
-  const absences = await Absence.find(scopeQuery(organizationId, {
-    employee_id: employeeId,
-    date: { $gte: quarterStart },
-    type: { $in: ['sick', 'personal'] } // Exclude approved PTO
-  }));
-
-  const tardies = await Absence.find(scopeQuery(organizationId, {
-    employee_id: employeeId,
-    date: { $gte: quarterStart },
-    type: 'late'
-  }));
-
-  const absencePoints = absences.length;
-  const tardyPoints = Math.floor(tardies.length / 3);
-
-  return absencePoints + tardyPoints;
-};
-
-// Get attendance status based on points
-exports.getStatus = (points) => {
-  if (points >= 6) return 'review_required';
-  if (points >= 4) return 'at_risk';
-  if (points >= 3) return 'watch';
-  return 'good';
-};
-
-// Update employee attendance stats
-exports.updateEmployeeStats = async (employeeId, organizationId) => {
-  const quarterStart = getQuarterStart();
-
-  const employee = await Employee.findOne(scopeQuery(organizationId, { _id: employeeId }));
-  if (!employee) {
-    throw new Error('Employee not found');
-  }
-
-  // Count absences
-  const absences = await Absence.countDocuments(scopeQuery(organizationId, {
-    employee_id: employeeId,
-    date: { $gte: quarterStart },
-    type: { $in: ['sick', 'personal'] }
-  }));
-
-  // Count tardies
-  const tardies = await Absence.countDocuments(scopeQuery(organizationId, {
-    employee_id: employeeId,
-    date: { $gte: quarterStart },
-    type: 'late'
-  }));
-
-  // Calculate points
-  const points = await this.calculatePoints(employeeId, organizationId);
-  const status = this.getStatus(points);
-
-  // Update employee
-  employee.points_current_quarter = points;
-  employee.absences_this_quarter = absences;
-  employee.tardies_this_quarter = tardies;
-  employee.status = status;
-
-  await employee.save();
-
-  return employee;
-};
-
 // Check if notice was given in time (30 minutes before shift)
 exports.checkNoticeTime = (employee, callTime) => {
   const shiftStart = this.getShiftStartTime(employee.shift);
@@ -117,21 +37,6 @@ exports.getShiftStartTime = (shift) => {
   return today;
 };
 
-// Calculate points to award for an absence
-exports.calculatePointsToAward = (absenceType) => {
-  switch (absenceType) {
-    case 'sick':
-    case 'personal':
-      return 1.0;
-    case 'late':
-      return 0.33;
-    case 'approved_pto':
-      return 0.0;
-    default:
-      return 1.0;
-  }
-};
-
 // Get today's attendance summary
 exports.getTodaysSummary = async (organizationId) => {
   const today = new Date();
@@ -156,13 +61,6 @@ exports.getTodaysSummary = async (organizationId) => {
     lateCount,
     absences: todaysAbsences
   };
-};
-
-// Get employees at risk
-exports.getAtRiskEmployees = async (organizationId) => {
-  return await Employee.find(scopeQuery(organizationId, {
-    status: { $in: ['at_risk', 'review_required'] }
-  })).sort({ points_current_quarter: -1 });
 };
 
 module.exports = exports;

@@ -25,7 +25,18 @@ const absenceSchema = new mongoose.Schema({
   },
   type: {
     type: String,
-    enum: ['sick', 'late', 'personal', 'approved_pto'],
+    enum: [
+      // SMS-based absences (automated)
+      'sick',
+      'late',
+      'personal',
+      // Manual admin-logged incidents (5 core edge cases)
+      'no_sms_no_show',
+      'late_sms_no_show',
+      'left_early_no_permission',
+      'left_early_permission',
+      'late_in_no_sms'
+    ],
     required: true
   },
   reason: {
@@ -50,12 +61,6 @@ const absenceSchema = new mongoose.Schema({
   report_message: {
     type: String,
     default: null
-  },
-
-  // Attendance tracking
-  points_awarded: {
-    type: Number,
-    required: true
   },
 
   // Notifications
