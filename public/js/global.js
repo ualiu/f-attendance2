@@ -11,6 +11,27 @@ function toggleSidebar() {
   }
 }
 
+// Toggle user dropdown menu
+function toggleUserMenu(event) {
+  event.stopPropagation(); // Prevent event from bubbling
+  const dropdown = document.getElementById('userDropdown');
+
+  if (dropdown) {
+    const isVisible = dropdown.style.display === 'block';
+    dropdown.style.display = isVisible ? 'none' : 'block';
+  }
+}
+
+// Close dropdown when clicking outside
+document.addEventListener('click', function(event) {
+  const dropdown = document.getElementById('userDropdown');
+  const userInfo = document.querySelector('.user-info');
+
+  if (dropdown && userInfo && !userInfo.contains(event.target)) {
+    dropdown.style.display = 'none';
+  }
+});
+
 // Close sidebar when clicking on a link (mobile only)
 document.addEventListener('DOMContentLoaded', function() {
   document.querySelectorAll('.sidebar-link, .logout-btn').forEach(link => {

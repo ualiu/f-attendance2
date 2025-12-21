@@ -39,25 +39,41 @@ router.get('/employee/:id', async (req, res) => {
     const employee = await validateTenantAccess(Employee, req.params.id, req.organizationId);
     await employee.populate('supervisor_id');
 
-    // Get all absences for this quarter
-    const quarterStart = new Date();
-    const month = quarterStart.getMonth();
-    if (month < 3) quarterStart.setMonth(0, 1);
-    else if (month < 6) quarterStart.setMonth(3, 1);
-    else if (month < 9) quarterStart.setMonth(6, 1);
-    else quarterStart.setMonth(9, 1);
-    quarterStart.setHours(0, 0, 0, 0);
+    // Get date range from query params or default to current quarter
+    let startDate, endDate;
+    const { start, end } = req.query;
+
+    if (start && end) {
+      // Custom date range
+      startDate = new Date(start);
+      startDate.setHours(0, 0, 0, 0);
+      endDate = new Date(end);
+      endDate.setHours(23, 59, 59, 999);
+    } else {
+      // Default to current quarter
+      startDate = new Date();
+      const month = startDate.getMonth();
+      if (month < 3) startDate.setMonth(0, 1);
+      else if (month < 6) startDate.setMonth(3, 1);
+      else if (month < 9) startDate.setMonth(6, 1);
+      else startDate.setMonth(9, 1);
+      startDate.setHours(0, 0, 0, 0);
+
+      endDate = new Date();
+      endDate.setHours(23, 59, 59, 999);
+    }
 
     const absences = await Absence.find(scopeQuery(req.organizationId, {
       employee_id: employee._id,
-      date: { $gte: quarterStart }
+      date: { $gte: startDate, $lte: endDate }
     })).sort({ date: -1 });
 
     res.render('dashboard/employee', {
       title: `Employee: ${employee.name}`,
       employee,
       absences,
-      quarterStart
+      startDate,
+      endDate
     });
   } catch (error) {
     if (error.message === 'Resource not found or access denied') {

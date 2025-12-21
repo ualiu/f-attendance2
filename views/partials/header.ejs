@@ -10,7 +10,7 @@
 
     <div class="header-right">
       <% if (user) { %>
-        <div class="user-info">
+        <div class="user-info" onclick="toggleUserMenu(event)" style="cursor: pointer; position: relative;">
           <% if (user.profile_picture) { %>
             <img src="<%= user.profile_picture %>" alt="<%= user.name %>" class="user-avatar">
           <% } else { %>
@@ -24,6 +24,19 @@
           <% } else { %>
             <span class="user-role"><%= user.role %></span>
           <% } %>
+          <span style="margin-left: 0.25rem; font-size: 0.75em;">▼</span>
+
+          <!-- Dropdown Menu -->
+          <div id="userDropdown" class="user-dropdown" style="display: none;">
+            <div class="dropdown-header">
+              <strong><%= user.name %></strong>
+              <small style="color: #666; display: block;"><%= user.email %></small>
+            </div>
+            <div class="dropdown-divider"></div>
+            <a href="/auth/logout" class="dropdown-item">
+              <span style="margin-right: 0.5rem;">🚪</span> Logout
+            </a>
+          </div>
         </div>
       <% } %>
     </div>

@@ -90,8 +90,23 @@
 
     <div class="section">
       <div class="section-header">
-        <h2>Absence History (This Quarter)</h2>
-        <small style="color: #666;">Starting <%= quarterStart.toLocaleDateString() %></small>
+        <h2>Absence History</h2>
+      </div>
+
+      <!-- Date Range Filter -->
+      <div style="background: white; padding: 1rem; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); margin-bottom: 1rem;">
+        <form method="GET" action="/dashboard/employee/<%= employee._id %>" style="display: flex; gap: 1rem; align-items: end; flex-wrap: wrap;">
+          <div class="form-group" style="margin: 0;">
+            <label style="display: block; margin-bottom: 0.25rem; font-weight: 500;">Start Date</label>
+            <input type="date" name="start" value="<%= startDate.toISOString().split('T')[0] %>" style="padding: 0.5rem; border: 1px solid #ddd; border-radius: 4px;">
+          </div>
+          <div class="form-group" style="margin: 0;">
+            <label style="display: block; margin-bottom: 0.25rem; font-weight: 500;">End Date</label>
+            <input type="date" name="end" value="<%= endDate.toISOString().split('T')[0] %>" style="padding: 0.5rem; border: 1px solid #ddd; border-radius: 4px;">
+          </div>
+          <button type="submit" class="btn btn-primary" style="margin: 0;">Apply</button>
+          <a href="/dashboard/employee/<%= employee._id %>" class="btn btn-secondary" style="margin: 0;">Reset to Quarter</a>
+        </form>
       </div>
 
       <div class="table-responsive">
