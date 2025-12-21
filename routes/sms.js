@@ -53,6 +53,21 @@ router.post('/incoming', async (req, res) => {
     const smsService = llmProvider === 'openai' ? smsServiceOpenAI : smsServiceClaude;
     console.log(`   🤖 Using LLM provider: ${llmProvider.toUpperCase()}`);
 
+    // Get organization timezone and current time
+    const orgTimezone = organization?.settings?.timezone || 'America/New_York';
+    const now = new Date();
+    const currentTimeInTZ = now.toLocaleString('en-US', {
+      timeZone: orgTimezone,
+      weekday: 'long',
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: true
+    });
+    console.log(`   🕐 Current time in ${orgTimezone}: ${currentTimeInTZ}`);
+
     // Get conversation state (if this is a follow-up)
     let conversationState = smsService.getConversationState(phoneNumber);
     const isFollowUp = conversationState !== null;
@@ -83,8 +98,11 @@ router.post('/incoming', async (req, res) => {
     conversationState = smsService.updateConversationState(phoneNumber, messageBody, null, null, conversationState.transcript);
     console.log('   📝 After updateConversationState. Transcript length:', conversationState.transcript.length);
 
-    // Parse the SMS message using Claude LLM with conversation context
-    const parsedData = await smsService.parseAttendanceMessage(messageBody, employee, organizationName, conversationState);
+    // Parse the SMS message using LLM with conversation context and timezone
+    const parsedData = await smsService.parseAttendanceMessage(messageBody, employee, organizationName, conversationState, {
+      timezone: orgTimezone,
+      currentTime: currentTimeInTZ
+    });
 
     console.log('   📋 Parsed data:', parsedData);
 

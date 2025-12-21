@@ -56,6 +56,10 @@ const organizationSchema = new mongoose.Schema({
       type: String,
       enum: ['claude', 'openai'],
       default: 'claude'
+    },
+    timezone: {
+      type: String,
+      default: 'America/New_York' // Eastern Time (ET)
     }
   },
 

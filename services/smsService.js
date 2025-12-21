@@ -103,7 +103,7 @@ exports.markConversationActive = (phoneNumber) => {
 };
 
 // Parse attendance message using Claude
-exports.parseAttendanceMessage = async (messageBody, employee, organizationName = 'your company', conversationState = null) => {
+exports.parseAttendanceMessage = async (messageBody, employee, organizationName = 'your company', conversationState = null, timezoneContext = null) => {
   try {
     // Build conversation context if this is a follow-up
     let conversationContext = '';
@@ -150,12 +150,31 @@ exports.parseAttendanceMessage = async (messageBody, employee, organizationName 
       conversationContext += '═══════════════════════════════════════════════════════════════════\n';
     }
 
+    // Build timezone context
+    let timezoneInfo = '';
+    if (timezoneContext) {
+      timezoneInfo = `
+═══════════════════════════════════════════════════════════════════
+CURRENT DATE & TIME (Organization Timezone: ${timezoneContext.timezone})
+═══════════════════════════════════════════════════════════════════
+
+📅 CURRENT TIME: ${timezoneContext.currentTime}
+
+🚨 CRITICAL: Use this current time to understand time references in the message:
+• "away from 1:30 to 2:30" - Calculate if this is future or happening now
+• "this afternoon" - Understand what time that means relative to NOW
+• "later today" - Know what time of day it currently is
+• Calculate exact durations from time ranges (e.g., 1:30-2:30 = 60 minutes)
+
+`;
+    }
+
     const prompt = `You are an attendance assistant for ${organizationName}. Parse employee messages naturally and extract key information. Be EXTREMELY flexible and forgiving - employees text quickly and informally.
 
 Employee: ${employee.name}
 Shift: ${employee.shift}
 Started: ${employee.start_date ? new Date(employee.start_date).toLocaleDateString() : 'Unknown'}
-${conversationContext}
+${timezoneInfo}${conversationContext}
 MESSAGE TO PARSE:
 "${messageBody}"
 
@@ -243,17 +262,26 @@ CLASSIFICATION RULES:
    • If message mentions "running late", "on my way", "stuck in traffic" → LATE
 2. If LATE → always type "late" (regardless of duration)
 3. If ABSENCE → classify by duration:
-   • < 2 hours (< 120 min) → "half_day" with subtype sick/personal
+   🚨 CRITICAL - DURATION CLASSIFICATION:
+   • < 2 hours (< 120 min) → "short_absence" with subtype sick/personal
    • 2-4 hours (120-240 min) → "half_day" with subtype sick/personal
    • 4+ hours (240+ min) → "full_day" with subtype sick/personal
 
+   EXAMPLES:
+   • 1 hour away = "short_absence" (NOT half_day!)
+   • 1.5 hours away = "short_absence" (NOT half_day!)
+   • 2 hours away = "half_day"
+   • 3 hours away = "half_day"
+   • 5 hours away = "full_day"
+
 EXAMPLES:
 • "running late 30 min" → LATE (arrival delay at shift start)
-• "away from 1:30 to 2:30 for appointment" → HALF_DAY (1 hour absence, NOT late!)
-• "I'm away afternoon from 1:30 to 2:30 because I have doctors appointment" → HALF_DAY (60 min, NOT late!)
-• "doctor appointment 1 hour" → HALF_DAY (1 hour absence during workday, NOT late!)
+• "away from 1:30 to 2:30 for appointment" → SHORT_ABSENCE (1 hour absence, NOT half_day!)
+• "I'm away afternoon from 1:30 to 2:30 because I have doctors appointment" → SHORT_ABSENCE (60 min, NOT half_day!)
+• "doctor appointment 1 hour" → SHORT_ABSENCE (1 hour absence during workday, NOT half_day!)
 • "stuck in traffic, be there in 1 hour" → LATE (arrival delay at shift start)
 • "stepping out for 3 hours" → HALF_DAY (3 hour mid-day absence)
+• "away for 2 hours" → HALF_DAY (2 hours = half day threshold)
 • "leaving early for appointment" → ABSENCE (type depends on duration)
 • "sick today" → FULL_DAY (full day absence)
 
@@ -528,7 +556,7 @@ OUTPUT FORMAT - JSON ONLY
 YOU MUST respond with ONLY valid JSON. Start with { and end with }.
 
 {
-  "type": "late|half_day|full_day|unclear|unclear_duration",
+  "type": "late|short_absence|half_day|full_day|unclear|unclear_duration",
   "subtype": "sick|personal|null",
   "reason": "extracted reason or null",
   "duration_minutes": number or null,
@@ -540,8 +568,12 @@ YOU MUST respond with ONLY valid JSON. Start with { and end with }.
 }
 
 Field Definitions:
-• type: Primary classification (late/half_day/full_day/unclear/unclear_duration)
-• subtype: For full_day/half_day, is it "sick" or "personal"? null for late
+• type: Primary classification (late/short_absence/half_day/full_day/unclear/unclear_duration)
+  - late: Arrival delay at shift start (any duration)
+  - short_absence: Mid-day absence < 2 hours
+  - half_day: Mid-day absence 2-4 hours
+  - full_day: Absence 4+ hours or all day
+• subtype: For short_absence/half_day/full_day, is it "sick" or "personal"? null for late
 • reason: The specific reason extracted from message, or null
 • duration_minutes: Extracted duration in minutes, or null
 • date: Date reference ("today", "tomorrow", day name, or specific date). Default to "today" if not specified
@@ -687,8 +719,11 @@ exports.logAbsenceFromSMS = async ({ employee, parsedData, originalMessage, phon
 
     // Classify based on duration
     if (parsedData.type === 'late') {
-      // < 2 hours late
+      // Arrival delay at shift start
       absenceType = 'late';
+    } else if (parsedData.type === 'short_absence') {
+      // < 2 hours mid-day absence
+      absenceType = parsedData.subtype || 'personal'; // Use subtype (sick/personal)
     } else if (parsedData.type === 'half_day') {
       // 2-4 hours = half day absence
       absenceType = parsedData.subtype || 'personal'; // Use subtype (sick/personal)
@@ -768,6 +803,10 @@ exports.generateResponseMessage = async (employee, absence, parsedData) => {
   if (parsedData.type === 'late') {
     const mins = duration > 0 ? `${duration} min` : 'late';
     message += `Logged as late (${mins}). ✅`;
+  } else if (parsedData.type === 'short_absence') {
+    const hours = duration > 0 ? `${Math.round(duration / 60 * 10) / 10} hours` : 'short absence';
+    const typeLabel = parsedData.subtype === 'sick' ? 'sick' : 'personal';
+    message += `Logged as ${typeLabel} (${hours}). ✅`;
   } else if (parsedData.type === 'half_day') {
     const hours = duration > 0 ? `${Math.round(duration / 60 * 10) / 10} hours` : 'half day';
     const typeLabel = parsedData.subtype === 'sick' ? 'sick (half day)' : 'personal (half day)';

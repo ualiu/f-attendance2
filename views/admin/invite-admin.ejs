@@ -46,6 +46,37 @@
       <div id="llmStatusMessage" style="margin-top: 1rem; padding: 0.75rem; border-radius: 6px; display: none;"></div>
     </div>
 
+    <!-- Timezone Settings Section -->
+    <div class="card" style="margin-bottom: 2rem;">
+      <h2>Organization Timezone</h2>
+      <p style="color: #6b7280; margin-bottom: 1.5rem;">Set the timezone for your organization. All times and dates will be displayed in this timezone.</p>
+
+      <div class="form-group">
+        <label for="timezoneSelect" style="display: block; margin-bottom: 0.5rem; font-weight: 600;">Timezone</label>
+        <select id="timezoneSelect" class="timezone-select" onchange="updateTimezone(this.value)">
+          <optgroup label="US Timezones">
+            <option value="America/New_York" <%= organization?.settings?.timezone === 'America/New_York' ? 'selected' : '' %>>Eastern Time (ET)</option>
+            <option value="America/Chicago" <%= organization?.settings?.timezone === 'America/Chicago' ? 'selected' : '' %>>Central Time (CT)</option>
+            <option value="America/Denver" <%= organization?.settings?.timezone === 'America/Denver' ? 'selected' : '' %>>Mountain Time (MT)</option>
+            <option value="America/Phoenix" <%= organization?.settings?.timezone === 'America/Phoenix' ? 'selected' : '' %>>Arizona Time (MST - No DST)</option>
+            <option value="America/Los_Angeles" <%= organization?.settings?.timezone === 'America/Los_Angeles' ? 'selected' : '' %>>Pacific Time (PT)</option>
+            <option value="America/Anchorage" <%= organization?.settings?.timezone === 'America/Anchorage' ? 'selected' : '' %>>Alaska Time (AKT)</option>
+            <option value="Pacific/Honolulu" <%= organization?.settings?.timezone === 'Pacific/Honolulu' ? 'selected' : '' %>>Hawaii Time (HST)</option>
+          </optgroup>
+          <optgroup label="Canada Timezones">
+            <option value="America/Halifax" <%= organization?.settings?.timezone === 'America/Halifax' ? 'selected' : '' %>>Atlantic Time (AT)</option>
+            <option value="America/Toronto" <%= organization?.settings?.timezone === 'America/Toronto' ? 'selected' : '' %>>Eastern Time - Toronto</option>
+            <option value="America/Winnipeg" <%= organization?.settings?.timezone === 'America/Winnipeg' ? 'selected' : '' %>>Central Time - Winnipeg</option>
+            <option value="America/Edmonton" <%= organization?.settings?.timezone === 'America/Edmonton' ? 'selected' : '' %>>Mountain Time - Edmonton</option>
+            <option value="America/Vancouver" <%= organization?.settings?.timezone === 'America/Vancouver' ? 'selected' : '' %>>Pacific Time - Vancouver</option>
+          </optgroup>
+        </select>
+        <small style="color: #6b7280; display: block; margin-top: 0.5rem;">Current time in selected timezone: <strong id="currentTimezoneTime">Loading...</strong></small>
+      </div>
+
+      <div id="timezoneStatusMessage" style="margin-top: 1rem; padding: 0.75rem; border-radius: 6px; display: none;"></div>
+    </div>
+
     <!-- Add Admin Button -->
     <div style="margin-bottom: 2rem;">
       <button onclick="showAddAdminModal()" class="btn btn-primary">+ Add Admin</button>
@@ -236,6 +267,28 @@
       font-weight: bold;
       font-size: 14px;
     }
+
+    /* Timezone Select Styles */
+    .timezone-select {
+      width: 100%;
+      padding: 0.75rem;
+      border: 1px solid #d1d5db;
+      border-radius: 6px;
+      font-size: 1rem;
+      background: white;
+      cursor: pointer;
+      transition: border-color 0.2s;
+    }
+
+    .timezone-select:hover {
+      border-color: #4f46e5;
+    }
+
+    .timezone-select:focus {
+      outline: none;
+      border-color: #4f46e5;
+      box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1);
+    }
   </style>
 
   <script>
@@ -281,6 +334,82 @@
         }, 3000);
       }
     }
+
+    // Update Timezone
+    async function updateTimezone(timezone) {
+      const statusMessage = document.getElementById('timezoneStatusMessage');
+
+      try {
+        const response = await fetch('/api/organization/settings/timezone', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ timezone })
+        });
+
+        if (response.ok) {
+          // Show success message
+          statusMessage.style.display = 'block';
+          statusMessage.style.background = '#d1fae5';
+          statusMessage.style.color = '#065f46';
+          statusMessage.style.border = '1px solid #10b981';
+          statusMessage.textContent = `✅ Timezone updated to ${timezone}`;
+
+          // Update current time display
+          updateTimezoneDisplay(timezone);
+
+          setTimeout(() => {
+            statusMessage.style.display = 'none';
+          }, 3000);
+        } else {
+          throw new Error('Failed to update timezone');
+        }
+      } catch (error) {
+        console.error('Error:', error);
+        statusMessage.style.display = 'block';
+        statusMessage.style.background = '#fee2e2';
+        statusMessage.style.color = '#991b1b';
+        statusMessage.style.border = '1px solid #ef4444';
+        statusMessage.textContent = '❌ Error updating timezone. Please try again.';
+
+        setTimeout(() => {
+          statusMessage.style.display = 'none';
+        }, 3000);
+      }
+    }
+
+    // Update timezone display
+    function updateTimezoneDisplay(timezone) {
+      const currentTimeElement = document.getElementById('currentTimezoneTime');
+      const now = new Date();
+
+      const options = {
+        timeZone: timezone,
+        hour: 'numeric',
+        minute: '2-digit',
+        second: '2-digit',
+        hour12: true,
+        weekday: 'short',
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric'
+      };
+
+      const formatter = new Intl.DateTimeFormat('en-US', options);
+      currentTimeElement.textContent = formatter.format(now);
+    }
+
+    // Initialize timezone display on page load
+    document.addEventListener('DOMContentLoaded', function() {
+      const timezoneSelect = document.getElementById('timezoneSelect');
+      if (timezoneSelect) {
+        updateTimezoneDisplay(timezoneSelect.value);
+
+        // Update time every second
+        setInterval(() => {
+          updateTimezoneDisplay(timezoneSelect.value);
+        }, 1000);
+      }
+    });
 
     function showAddAdminModal() {
       document.getElementById('addAdminModal').style.display = 'flex';

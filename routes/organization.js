@@ -48,4 +48,45 @@ router.put('/settings/llm-provider', async (req, res) => {
   }
 });
 
+// Update timezone setting
+router.put('/settings/timezone', async (req, res) => {
+  try {
+    const { timezone } = req.body;
+
+    // Validate timezone (basic check - could be more comprehensive)
+    if (!timezone || typeof timezone !== 'string') {
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid timezone'
+      });
+    }
+
+    // Update organization settings
+    const organization = await Organization.findById(req.organizationId);
+    if (!organization) {
+      return res.status(404).json({
+        success: false,
+        error: 'Organization not found'
+      });
+    }
+
+    organization.settings.timezone = timezone;
+    await organization.save();
+
+    console.log(`✅ Organization ${organization.name} timezone updated to ${timezone}`);
+
+    res.json({
+      success: true,
+      message: `Timezone updated to ${timezone}`,
+      timezone
+    });
+  } catch (error) {
+    console.error('Error updating timezone:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
 module.exports = router;

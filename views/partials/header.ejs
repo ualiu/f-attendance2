@@ -32,6 +32,23 @@
               <strong><%= user.name %></strong>
               <small style="color: #666; display: block;"><%= user.email %></small>
             </div>
+
+            <!-- Organization Clock -->
+            <div class="dropdown-divider"></div>
+            <div class="dropdown-item" style="cursor: default; background: #f8f9fa; padding: 0.75rem 1rem;">
+              <div style="text-align: center;">
+                <div style="font-size: 0.75rem; color: #6b7280; font-weight: 600; text-transform: uppercase; margin-bottom: 0.25rem;">
+                  <span id="orgTimezoneName">Loading...</span>
+                </div>
+                <div id="orgCurrentTime" style="font-size: 1.25rem; font-weight: 700; color: #111827; font-variant-numeric: tabular-nums;">
+                  --:--:-- --
+                </div>
+                <div id="orgCurrentDate" style="font-size: 0.875rem; color: #6b7280; margin-top: 0.25rem;">
+                  ---------
+                </div>
+              </div>
+            </div>
+
             <div class="dropdown-divider"></div>
             <a href="/auth/logout" class="dropdown-item">
               <span style="margin-right: 0.5rem;">🚪</span> Logout
@@ -44,3 +61,8 @@
 </header>
 
 <div class="sidebar-overlay" onclick="toggleSidebar()"></div>
+
+<script>
+  // Expose organization timezone to JavaScript
+  window.ORG_TIMEZONE = '<%= organization?.settings?.timezone || "America/New_York" %>';
+</script>
