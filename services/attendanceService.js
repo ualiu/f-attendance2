@@ -52,7 +52,7 @@ exports.getTodaysSummary = async (organizationId) => {
   const totalEmployees = await Employee.countDocuments(scopeQuery(organizationId));
   const absentCount = todaysAbsences.filter(a => a.type !== 'late').length;
   const lateCount = todaysAbsences.filter(a => a.type === 'late').length;
-  const presentCount = totalEmployees - absentCount;
+  const presentCount = totalEmployees - absentCount - lateCount;
 
   return {
     totalEmployees,

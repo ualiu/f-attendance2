@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title><%= title %></title>
   <link rel="stylesheet" href="/css/style.css">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 </head>
 <body>
   <%- include('../partials/header') %>
@@ -102,46 +103,40 @@
       </div>
     </div>
 
-    <!-- Timeline View -->
-    <div class="card">
-      <h2>Absence Timeline</h2>
-      <% if (absences.length === 0) { %>
-        <p style="text-align: center; color: #666; padding: 2rem;">No absences found for the selected period</p>
+    <!-- Interactive Absence Timeline Chart -->
+    <div class="card" style="margin-bottom: 2rem;">
+      <h2>Employee Absence Overview</h2>
+      <p style="color: #666; margin-bottom: 1rem;">
+        Visual breakdown of absences by employee for the selected period
+        <% if (employeeChartData.length > 15) { %>
+          <span style="color: #17a2b8; font-weight: 500;"> • Scroll horizontally to see all <%= employeeChartData.length %> employees →</span>
+        <% } %>
+      </p>
+
+      <% if (employeeChartData.length === 0) { %>
+        <p style="text-align: center; color: #666; padding: 3rem;">No absences found for the selected period</p>
       <% } else { %>
-        <div class="table-responsive">
-          <table class="data-table">
-            <thead>
-              <tr>
-                <th>Date</th>
-                <th>Employee</th>
-                <th>Type</th>
-                <th>Reason</th>
-                <th>Method</th>
-              </tr>
-            </thead>
-            <tbody>
-              <% absences.forEach(absence => { %>
-                <tr>
-                  <td><%= new Date(absence.date).toLocaleDateString() %></td>
-                  <td>
-                    <% if (absence.employee_id) { %>
-                      <a href="/dashboard/employee/<%= absence.employee_id._id %>">
-                        <%= absence.employee_name %>
-                      </a>
-                    <% } else { %>
-                      <%= absence.employee_name %>
-                    <% } %>
-                  </td>
-                  <td><span class="type-badge type-<%= absence.type %>"><%= absence.type %></span></td>
-                  <td><%= absence.reason %></td>
-                  <td><%= absence.report_method || 'N/A' %></td>
-                </tr>
-              <% }); %>
-            </tbody>
-          </table>
+        <!-- Scrollable container for many employees -->
+        <div style="overflow-x: auto; overflow-y: hidden; margin-bottom: 1rem;">
+          <div style="position: relative; height: 500px; width: <%= Math.max(400, employeeChartData.length * 50) %>px; max-width: 100%;">
+            <canvas id="absenceChart"></canvas>
+          </div>
+        </div>
+
+        <!-- Chart Legend -->
+        <div style="display: flex; justify-content: center; gap: 2rem; flex-wrap: wrap; margin-top: 1rem; padding: 1rem; background: #f8f9fa; border-radius: 6px;">
+          <div style="display: flex; align-items: center; gap: 0.5rem;">
+            <div style="width: 20px; height: 20px; background: #dc3545; border-radius: 4px;"></div>
+            <span>Absences</span>
+          </div>
+          <div style="display: flex; align-items: center; gap: 0.5rem;">
+            <div style="width: 20px; height: 20px; background: #ffc107; border-radius: 4px;"></div>
+            <span>Lates</span>
+          </div>
         </div>
       <% } %>
     </div>
+
   </main>
 
   <script src="/js/global.js"></script>
@@ -166,7 +161,167 @@
         const rawType = badge.textContent.trim();
         badge.textContent = formatAbsenceType(rawType);
       });
+
+      // Initialize the absence chart
+      initAbsenceChart();
     });
+
+    function initAbsenceChart() {
+      const canvas = document.getElementById('absenceChart');
+      if (!canvas) return; // No chart to render
+
+      // Data from server
+      const chartData = <%- JSON.stringify(employeeChartData) %>;
+
+      if (chartData.length === 0) return;
+
+      // Debug: Log the data
+      console.log('📊 Chart Data:', chartData);
+
+      // Prepare data for stacked vertical bar chart
+      const labels = chartData.map(emp => emp.name);
+      const absencesData = chartData.map(emp => emp.absences);
+      const latesData = chartData.map(emp => emp.lates);
+
+      console.log('📊 Labels:', labels);
+      console.log('📊 Absences:', absencesData);
+      console.log('📊 Lates:', latesData);
+
+      const ctx = canvas.getContext('2d');
+
+      new Chart(ctx, {
+        type: 'bar',
+        data: {
+          labels: labels,
+          datasets: [
+            {
+              label: 'Absences',
+              data: absencesData,
+              backgroundColor: '#dc3545', // Red for absences
+              borderWidth: 0
+            },
+            {
+              label: 'Lates',
+              data: latesData,
+              backgroundColor: '#ffc107', // Yellow for lates
+              borderWidth: 0
+            }
+          ]
+        },
+        options: {
+          indexAxis: 'x', // Vertical bars (names at bottom)
+          responsive: true,
+          maintainAspectRatio: false,
+          maxBarThickness: 35, // Consistent bar width
+          barPercentage: 0.9, // Clean, consistent bars
+          categoryPercentage: 0.95, // Small consistent gap
+          plugins: {
+            legend: {
+              display: false // We have custom legend
+            },
+            tooltip: {
+              callbacks: {
+                title: function(context) {
+                  // Show employee name
+                  return context[0].label;
+                },
+                label: function(context) {
+                  const label = context.dataset.label || '';
+                  const value = context.parsed.y;
+
+                  // Only show this type if it has a value > 0
+                  if (value > 0) {
+                    return `${label}: ${value} day${value !== 1 ? 's' : ''}`;
+                  }
+                  return null;
+                },
+                footer: function(tooltipItems) {
+                  // Calculate total from all segments
+                  let total = 0;
+                  const employeeIndex = tooltipItems[0].dataIndex;
+                  const chartData = <%- JSON.stringify(employeeChartData) %>;
+
+                  if (chartData[employeeIndex]) {
+                    total = chartData[employeeIndex].total;
+                  }
+
+                  return `─────────────\nTotal: ${total} day${total !== 1 ? 's' : ''}`;
+                }
+              },
+              filter: function(tooltipItem) {
+                // Only show tooltip items with values > 0
+                return tooltipItem.parsed.y > 0;
+              },
+              backgroundColor: 'rgba(0, 0, 0, 0.8)',
+              padding: 12,
+              titleFont: {
+                size: 14,
+                weight: 'bold'
+              },
+              bodyFont: {
+                size: 13
+              },
+              footerFont: {
+                size: 13,
+                weight: 'bold'
+              }
+            }
+          },
+          scales: {
+            x: {
+              stacked: true,
+              offset: true, // Add padding so bars don't touch axis
+              ticks: {
+                font: {
+                  size: 11,
+                  family: 'system-ui, -apple-system, sans-serif'
+                },
+                maxRotation: 45,
+                minRotation: 45,
+                color: '#333'
+              },
+              grid: {
+                display: false,
+                drawBorder: true,
+                borderColor: '#ddd'
+              }
+            },
+            y: {
+              stacked: true,
+              beginAtZero: true,
+              ticks: {
+                stepSize: 1,
+                font: {
+                  size: 11,
+                  family: 'system-ui, -apple-system, sans-serif'
+                },
+                color: '#666',
+                precision: 0
+              },
+              title: {
+                display: true,
+                text: 'Days',
+                font: {
+                  size: 12,
+                  weight: '600',
+                  family: 'system-ui, -apple-system, sans-serif'
+                },
+                color: '#333'
+              },
+              grid: {
+                color: 'rgba(0, 0, 0, 0.06)',
+                drawBorder: true,
+                borderColor: '#ddd'
+              }
+            }
+          },
+          interaction: {
+            mode: 'index',
+            intersect: false
+          }
+        }
+      });
+    }
   </script>
 </body>
 </html>

@@ -87,6 +87,33 @@ router.get('/', async (req, res) => {
       late: absences.filter(a => a.type === 'late').length
     };
 
+    // Group by employee for chart (employee name -> count by type)
+    const byEmployee = {};
+    absences.forEach(absence => {
+      const empName = absence.employee_name;
+      if (!byEmployee[empName]) {
+        byEmployee[empName] = {
+          total: 0,
+          lates: 0,
+          absences: 0
+        };
+      }
+      byEmployee[empName].total++;
+
+      // Categorize: Lates vs Absences
+      if (absence.type === 'late') {
+        byEmployee[empName].lates++;
+      } else {
+        // Everything else is an absence (sick, personal, manual incidents)
+        byEmployee[empName].absences++;
+      }
+    });
+
+    // Convert to sorted array for chart
+    const employeeChartData = Object.entries(byEmployee)
+      .map(([name, counts]) => ({ name, ...counts }))
+      .sort((a, b) => b.total - a.total); // Sort by total absences descending
+
     // Group by date for timeline
     const byDate = {};
     absences.forEach(absence => {
@@ -103,6 +130,7 @@ router.get('/', async (req, res) => {
       employees,
       stats,
       byDate,
+      employeeChartData,
       filters: {
         range,
         startDate: start.toISOString().split('T')[0],
