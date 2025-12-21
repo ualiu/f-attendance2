@@ -6,6 +6,12 @@ const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
 
+// Warn if API key is not configured
+if (!process.env.OPENAI_API_KEY) {
+  console.warn('⚠️  WARNING: OPENAI_API_KEY is not set in environment variables!');
+  console.warn('   OpenAI SMS parsing will fail. Please add OPENAI_API_KEY to your .env file.');
+}
+
 // Track recent conversations with full state
 // Key: phone number, Value: { timestamp, messages, collectedInfo }
 const recentConversations = new Map();
@@ -390,23 +396,35 @@ RESPOND WITH JSON ONLY - NO EXPLANATIONS!`;
     console.log("   🔄 Calling OpenAI API (GPT-5 Mini)...");
     console.log("   📝 Message to parse:", messageBody);
 
-    const completion = await openai.chat.completions.create({
-      model: "gpt-5-mini",
-      messages: [
-        {
-          role: "system",
-          content:
-            "You are an attendance assistant. Parse employee absence/late messages and respond with ONLY valid JSON. No explanations, no markdown code blocks, just raw JSON.",
-        },
-        {
-          role: "user",
-          content: prompt,
-        },
-      ],
-      response_format: { type: "json_object" },
-      temperature: 0.3,
-      max_tokens: 500,
-    });
+    let completion;
+    try {
+      completion = await openai.chat.completions.create({
+        model: "gpt-5-mini",
+        messages: [
+          {
+            role: "system",
+            content:
+              "You are an attendance assistant. Parse employee absence/late messages and respond with ONLY valid JSON. No explanations, no markdown code blocks, just raw JSON.",
+          },
+          {
+            role: "user",
+            content: prompt,
+          },
+        ],
+        response_format: { type: "json_object" },
+        temperature: 0.3,
+        max_completion_tokens: 500,
+      });
+    } catch (apiError) {
+      console.error("   ❌ OpenAI API call failed:", apiError.message);
+      console.error("   Error code:", apiError.code);
+      console.error("   Error type:", apiError.type);
+      return {
+        success: false,
+        ask_what: 'help',
+        error: `OpenAI API Error: ${apiError.message}`
+      };
+    }
 
     console.log("   ✅ OpenAI API responded");
     let responseText = completion.choices[0].message.content;

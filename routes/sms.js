@@ -155,6 +155,9 @@ router.post('/incoming', async (req, res) => {
       else {
         // Fallback - generic help
         console.log('   💬 Sending generic help message...');
+        console.log('   ⚠️  DEBUGGING - parsedData.ask_what:', parsedData.ask_what);
+        console.log('   ⚠️  DEBUGGING - parsedData.error:', parsedData.error);
+        console.log('   ⚠️  DEBUGGING - Full parsedData:', JSON.stringify(parsedData, null, 2));
         questionAsked = 'help';
         followUpMessage = `${greeting}please text something like: "Running 30 min late - traffic" or "Sick with flu" or "Out for appointment"`;
       }
