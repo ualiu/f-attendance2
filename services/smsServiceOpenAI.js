@@ -412,6 +412,17 @@ RESPOND WITH JSON ONLY - NO EXPLANATIONS!`;
     let responseText = completion.choices[0].message.content;
     console.log("   🤖 OpenAI response:", responseText);
 
+    // Strip markdown code blocks if present (same as Claude service)
+    responseText = responseText.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+
+    // Extract JSON from response (sometimes OpenAI adds explanation before JSON)
+    const jsonMatch = responseText.match(/\{[\s\S]*\}/);
+    if (jsonMatch) {
+      responseText = jsonMatch[0];
+    }
+
+    console.log("   📋 Cleaned response:", responseText);
+
     // Parse JSON response
     const parsed = JSON.parse(responseText);
 
