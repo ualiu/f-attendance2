@@ -47,15 +47,19 @@ router.post('/incoming', async (req, res) => {
     const organization = await Organization.findById(employee.organization_id);
     const organizationName = organization ? organization.name : 'your company';
 
-    // Check if this is a follow-up message (conversation already active)
-    const isFollowUp = smsService.isFollowUpMessage(phoneNumber);
+    // Get conversation state (if this is a follow-up)
+    let conversationState = smsService.getConversationState(phoneNumber);
+    const isFollowUp = conversationState !== null;
     console.log('   🔄 Is follow-up message:', isFollowUp);
+    if (conversationState) {
+      console.log('   💬 Conversation state:', JSON.stringify(conversationState.collectedInfo, null, 2));
+    }
 
-    // Mark this conversation as active
-    smsService.markConversationActive(phoneNumber);
+    // Add current message to conversation state (before parsing)
+    conversationState = smsService.updateConversationState(phoneNumber, messageBody, null);
 
-    // Parse the SMS message using Claude LLM
-    const parsedData = await smsService.parseAttendanceMessage(messageBody, employee, organizationName);
+    // Parse the SMS message using Claude LLM with conversation context
+    const parsedData = await smsService.parseAttendanceMessage(messageBody, employee, organizationName, conversationState);
 
     console.log('   📋 Parsed data:', parsedData);
 
@@ -65,6 +69,7 @@ router.post('/incoming', async (req, res) => {
 
       const twiml = new twilio.twiml.MessagingResponse();
       let followUpMessage = '';
+      let questionAsked = '';
 
       // Only greet on first message, not on follow-ups
       const greeting = isFollowUp ? '' : `Hi ${employee.name}, `;
@@ -73,11 +78,13 @@ router.post('/incoming', async (req, res) => {
       if (parsedData.ask_what === 'status') {
         // Completely unclear - ask what's happening
         console.log('   💬 Asking for status (sick/late/out)...');
+        questionAsked = 'status';
         followUpMessage = `${greeting}are you running late, calling out sick, or taking time off today?`;
       }
       else if (parsedData.ask_what === 'duration') {
         // We know the type but not duration
         console.log('   💬 Asking for duration...');
+        questionAsked = 'duration';
 
         if (parsedData.type === 'late' || parsedData.type === 'unclear_duration') {
           followUpMessage = `${greeting}how late will you be? (e.g., "30 min", "2 hours")`;
@@ -88,6 +95,7 @@ router.post('/incoming', async (req, res) => {
       else if (parsedData.ask_what === 'reason') {
         // We know duration/type but not reason
         console.log('   💬 Asking for reason...');
+        questionAsked = 'reason';
 
         if (parsedData.type === 'late') {
           followUpMessage = `${greeting}why are you running late? (e.g., traffic, car trouble, appointment)`;
@@ -104,8 +112,12 @@ router.post('/incoming', async (req, res) => {
       else {
         // Fallback - generic help
         console.log('   💬 Sending generic help message...');
+        questionAsked = 'help';
         followUpMessage = `${greeting}please text something like: "Running 30 min late - traffic" or "Sick with flu" or "Out for appointment"`;
       }
+
+      // Update conversation state with parsed data and question asked
+      smsService.updateConversationState(phoneNumber, null, parsedData, questionAsked);
 
       twiml.message(followUpMessage);
       console.log('   📤 Follow-up message:', followUpMessage);
@@ -124,6 +136,10 @@ router.post('/incoming', async (req, res) => {
     });
 
     console.log('   ✅ Absence logged:', absence._id);
+
+    // Clear conversation state since we successfully logged the absence
+    smsService.clearConversation(phoneNumber);
+    console.log('   🧹 Conversation cleared');
 
     // Generate response message
     const responseMessage = await smsService.generateResponseMessage(employee, absence, parsedData);

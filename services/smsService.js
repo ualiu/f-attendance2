@@ -6,43 +6,146 @@ const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY,
 });
 
-// Track recent conversations to avoid greeting on every message
-// Key: phone number, Value: timestamp of last message
+// Track recent conversations with full state
+// Key: phone number, Value: { timestamp, messages, collectedInfo }
 const recentConversations = new Map();
 
 // Check if this is a continuation of a recent conversation (within 10 minutes)
 exports.isFollowUpMessage = (phoneNumber) => {
-  const lastMessageTime = recentConversations.get(phoneNumber);
-  if (!lastMessageTime) return false;
+  const conversation = recentConversations.get(phoneNumber);
+  if (!conversation) return false;
 
   const tenMinutesAgo = Date.now() - (10 * 60 * 1000); // 10 minutes
-  const isFollowUp = lastMessageTime > tenMinutesAgo;
+  const isFollowUp = conversation.timestamp > tenMinutesAgo;
 
   return isFollowUp;
 };
 
-// Mark that we received a message from this number
-exports.markConversationActive = (phoneNumber) => {
-  recentConversations.set(phoneNumber, Date.now());
+// Get conversation state
+exports.getConversationState = (phoneNumber) => {
+  const conversation = recentConversations.get(phoneNumber);
+  if (!conversation) return null;
 
-  // Clean up old entries (over 15 minutes old) to prevent memory bloat
+  const tenMinutesAgo = Date.now() - (10 * 60 * 1000);
+  if (conversation.timestamp < tenMinutesAgo) {
+    // Conversation expired
+    recentConversations.delete(phoneNumber);
+    return null;
+  }
+
+  return conversation;
+};
+
+// Update conversation state
+exports.updateConversationState = (phoneNumber, messageBody, parsedData, questionAsked = null) => {
+  const existing = recentConversations.get(phoneNumber) || {
+    messages: [],
+    collectedInfo: {}
+  };
+
+  existing.timestamp = Date.now();
+  existing.messages.push({
+    text: messageBody,
+    timestamp: Date.now()
+  });
+
+  // Update collected info
+  if (parsedData) {
+    if (parsedData.type && !existing.collectedInfo.type) {
+      existing.collectedInfo.type = parsedData.type;
+    }
+    if (parsedData.subtype && !existing.collectedInfo.subtype) {
+      existing.collectedInfo.subtype = parsedData.subtype;
+    }
+    if (parsedData.reason && !existing.collectedInfo.reason) {
+      existing.collectedInfo.reason = parsedData.reason;
+    }
+    if (parsedData.duration_minutes && !existing.collectedInfo.duration_minutes) {
+      existing.collectedInfo.duration_minutes = parsedData.duration_minutes;
+    }
+  }
+
+  if (questionAsked) {
+    existing.lastQuestionAsked = questionAsked;
+  }
+
+  recentConversations.set(phoneNumber, existing);
+
+  // Clean up old entries (over 15 minutes old)
   const fifteenMinutesAgo = Date.now() - (15 * 60 * 1000);
-  for (const [phone, timestamp] of recentConversations.entries()) {
-    if (timestamp < fifteenMinutesAgo) {
+  for (const [phone, conv] of recentConversations.entries()) {
+    if (conv.timestamp < fifteenMinutesAgo) {
       recentConversations.delete(phone);
     }
   }
+
+  return existing;
+};
+
+// Clear conversation (when successfully logged)
+exports.clearConversation = (phoneNumber) => {
+  recentConversations.delete(phoneNumber);
+};
+
+// Legacy function for backward compatibility
+exports.markConversationActive = (phoneNumber) => {
+  exports.updateConversationState(phoneNumber, null, null);
 };
 
 // Parse attendance message using Claude
-exports.parseAttendanceMessage = async (messageBody, employee, organizationName = 'your company') => {
+exports.parseAttendanceMessage = async (messageBody, employee, organizationName = 'your company', conversationState = null) => {
   try {
+    // Build conversation context if this is a follow-up
+    let conversationContext = '';
+    if (conversationState && conversationState.messages && conversationState.messages.length > 1) {
+      conversationContext = '\n\n═══════════════════════════════════════════════════════════════════\n';
+      conversationContext += 'CONVERSATION HISTORY (This is a follow-up message)\n';
+      conversationContext += '═══════════════════════════════════════════════════════════════════\n\n';
+      conversationContext += 'Previous messages in this conversation:\n';
+
+      // Show previous messages (excluding the current one we're parsing)
+      const previousMessages = conversationState.messages.slice(0, -1);
+      previousMessages.forEach((msg, idx) => {
+        conversationContext += `${idx + 1}. "${msg.text}"\n`;
+      });
+
+      // Show what we've collected so far
+      if (conversationState.collectedInfo && Object.keys(conversationState.collectedInfo).length > 0) {
+        conversationContext += '\nINFO ALREADY COLLECTED:\n';
+        if (conversationState.collectedInfo.type) {
+          conversationContext += `- Type: ${conversationState.collectedInfo.type}\n`;
+        }
+        if (conversationState.collectedInfo.subtype) {
+          conversationContext += `- Subtype: ${conversationState.collectedInfo.subtype}\n`;
+        }
+        if (conversationState.collectedInfo.reason) {
+          conversationContext += `- Reason: ${conversationState.collectedInfo.reason}\n`;
+        }
+        if (conversationState.collectedInfo.duration_minutes) {
+          conversationContext += `- Duration: ${conversationState.collectedInfo.duration_minutes} minutes\n`;
+        }
+      }
+
+      // Show what question was asked
+      if (conversationState.lastQuestionAsked) {
+        conversationContext += `\nLAST QUESTION WE ASKED: ${conversationState.lastQuestionAsked}\n`;
+      }
+
+      conversationContext += '\n🚨 CRITICAL INSTRUCTIONS FOR FOLLOW-UP MESSAGES:\n';
+      conversationContext += '1. If the current message is JUST a duration (e.g., "1 hour", "30 min"), extract it as duration_minutes\n';
+      conversationContext += '2. If the current message is JUST a reason (e.g., "groceries", "traffic"), extract it as reason\n';
+      conversationContext += '3. Use the INFO ALREADY COLLECTED above - don\'t ask for it again!\n';
+      conversationContext += '4. If we already have BOTH duration and reason, set missing_duration=false and missing_reason=false\n';
+      conversationContext += '5. NEVER ask the same question twice - check conversation history first!\n';
+      conversationContext += '═══════════════════════════════════════════════════════════════════\n';
+    }
+
     const prompt = `You are an attendance assistant for ${organizationName}. Parse employee messages naturally and extract key information. Be EXTREMELY flexible and forgiving - employees text quickly and informally.
 
 Employee: ${employee.name}
 Shift: ${employee.shift}
 Started: ${employee.start_date ? new Date(employee.start_date).toLocaleDateString() : 'Unknown'}
-
+${conversationContext}
 MESSAGE TO PARSE:
 "${messageBody}"
 
@@ -294,6 +397,23 @@ COMPREHENSIVE EXAMPLES - LEARN THESE PATTERNS
 25. "court today" (legal)
 → {"type": "full_day", "subtype": "personal", "reason": "Court", "duration_minutes": 480, "has_duration": true, "has_reason": true, "missing_duration": false, "missing_reason": false}
 
+**FOLLOW-UP MESSAGE EXAMPLES (when conversation history exists):**
+
+26. Current message: "1 hour" (after being asked "how late will you be?")
+→ {"type": "late", "subtype": null, "reason": null, "duration_minutes": 60, "has_duration": true, "has_reason": false, "missing_duration": false, "missing_reason": true}
+
+27. Current message: "groceries" (after being asked "why are you running late?")
+→ {"type": "late", "subtype": null, "reason": "Groceries", "duration_minutes": null, "has_duration": false, "has_reason": true, "missing_duration": false, "missing_reason": false}
+
+28. Current message: "traffic" (when we already have duration from previous message)
+→ {"type": "late", "subtype": null, "reason": "Traffic", "duration_minutes": null, "has_duration": false, "has_reason": true, "missing_duration": false, "missing_reason": false}
+
+29. Current message: "2 hours" (after being asked "how long will you be out?")
+→ {"type": "half_day", "subtype": "personal", "reason": null, "duration_minutes": 120, "has_duration": true, "has_reason": false, "missing_duration": false, "missing_reason": true}
+
+30. Current message: "doctor appointment" (when we already have duration from conversation)
+→ {"type": null, "subtype": "personal", "reason": "Doctor appointment", "duration_minutes": null, "has_duration": false, "has_reason": true, "missing_duration": false, "missing_reason": false}
+
 ══════════════════════════════════════════════════════════════════
 OUTPUT FORMAT - JSON ONLY
 ══════════════════════════════════════════════════════════════════
@@ -355,8 +475,18 @@ RESPOND WITH JSON ONLY - NO EXPLANATIONS!`;
 
     console.log('   📊 Parsed data:', JSON.stringify(parsed, null, 2));
 
+    // Merge with previously collected info from conversation state
+    const mergedData = {
+      type: parsed.type || (conversationState?.collectedInfo?.type),
+      subtype: parsed.subtype || (conversationState?.collectedInfo?.subtype),
+      reason: parsed.reason || (conversationState?.collectedInfo?.reason),
+      duration_minutes: parsed.duration_minutes || (conversationState?.collectedInfo?.duration_minutes)
+    };
+
+    console.log('   🔗 Merged with conversation state:', JSON.stringify(mergedData, null, 2));
+
     // Handle completely unclear messages
-    if (parsed.type === 'unclear') {
+    if (parsed.type === 'unclear' && !conversationState?.collectedInfo?.type) {
       return {
         success: false,
         needs_clarification: true,
@@ -366,52 +496,61 @@ RESPOND WITH JSON ONLY - NO EXPLANATIONS!`;
     }
 
     // Handle messages with unclear duration (e.g., "doctor appointment" but no time specified)
-    if (parsed.type === 'unclear_duration') {
-      return {
-        success: false,
-        needs_clarification: false,
-        ask_what: 'duration', // Ask: how long?
-        subtype: parsed.subtype,
-        reason: parsed.reason,
-        error: 'Duration not specified'
-      };
+    if (parsed.type === 'unclear_duration' || (mergedData.type === 'unclear_duration')) {
+      // Only ask for duration if we don't already have it
+      if (!mergedData.duration_minutes) {
+        return {
+          success: false,
+          needs_clarification: false,
+          ask_what: 'duration', // Ask: how long?
+          type: mergedData.type,
+          subtype: mergedData.subtype,
+          reason: mergedData.reason,
+          error: 'Duration not specified'
+        };
+      }
     }
 
-    // Check if we need to ask for duration
-    if (parsed.missing_duration && parsed.type !== 'full_day') {
+    // Use merged data for final type determination
+    const finalType = mergedData.type === 'unclear_duration' ? 'half_day' : mergedData.type;
+
+    // Check if we need to ask for duration (only for non-full-day absences)
+    const needsDuration = !mergedData.duration_minutes && finalType !== 'full_day' && finalType !== 'unclear';
+    if (needsDuration) {
       console.log('   ⚠️ Missing duration');
       return {
         success: false,
         needs_clarification: false,
         ask_what: 'duration',
-        type: parsed.type,
-        subtype: parsed.subtype,
-        reason: parsed.reason,
+        type: finalType,
+        subtype: mergedData.subtype,
+        reason: mergedData.reason,
         error: 'Duration needed'
       };
     }
 
     // Check if we need to ask for reason
-    if (parsed.missing_reason) {
+    if (!mergedData.reason) {
       console.log('   ⚠️ Missing reason');
       return {
         success: false,
         needs_clarification: false,
         ask_what: 'reason',
-        type: parsed.type,
-        subtype: parsed.subtype,
-        duration_minutes: parsed.duration_minutes,
+        type: finalType,
+        subtype: mergedData.subtype,
+        duration_minutes: mergedData.duration_minutes,
         error: 'Reason needed'
       };
     }
 
     // Success - we have all the info we need
+    console.log('   ✅ All required info collected!');
     return {
       success: true,
-      type: parsed.type,
-      subtype: parsed.subtype,
-      reason: parsed.reason,
-      duration_minutes: parsed.duration_minutes
+      type: finalType,
+      subtype: mergedData.subtype,
+      reason: mergedData.reason,
+      duration_minutes: mergedData.duration_minutes
     };
 
   } catch (error) {
