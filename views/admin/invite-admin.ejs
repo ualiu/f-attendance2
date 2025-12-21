@@ -14,6 +14,38 @@
     <h1>Admin Management</h1>
     <p class="subtitle">Manage admin accounts for your organization</p>
 
+    <!-- Organization Settings Section -->
+    <div class="card" style="margin-bottom: 2rem;">
+      <h2>SMS Parsing AI Model</h2>
+      <p style="color: #6b7280; margin-bottom: 1.5rem;">Choose which AI model to use for parsing employee SMS messages</p>
+
+      <div class="llm-provider-selection">
+        <label class="radio-card <%= organization?.settings?.llm_provider === 'claude' || !organization?.settings?.llm_provider ? 'active' : '' %>" onclick="updateLLMProvider('claude')">
+          <input type="radio" name="llm_provider" value="claude" <%= organization?.settings?.llm_provider === 'claude' || !organization?.settings?.llm_provider ? 'checked' : '' %>>
+          <div class="radio-card-content">
+            <div class="radio-card-header">
+              <span class="radio-card-icon">🤖</span>
+              <h3>Claude Opus 4.5</h3>
+            </div>
+            <p>Anthropic's most intelligent model. Excellent at understanding context and nuanced language.</p>
+          </div>
+        </label>
+
+        <label class="radio-card <%= organization?.settings?.llm_provider === 'openai' ? 'active' : '' %>" onclick="updateLLMProvider('openai')">
+          <input type="radio" name="llm_provider" value="openai" <%= organization?.settings?.llm_provider === 'openai' ? 'checked' : '' %>>
+          <div class="radio-card-content">
+            <div class="radio-card-header">
+              <span class="radio-card-icon">⚡</span>
+              <h3>GPT-5 Mini</h3>
+            </div>
+            <p>OpenAI's latest and most advanced mini model. Exceptional performance for structured parsing tasks.</p>
+          </div>
+        </label>
+      </div>
+
+      <div id="llmStatusMessage" style="margin-top: 1rem; padding: 0.75rem; border-radius: 6px; display: none;"></div>
+    </div>
+
     <!-- Add Admin Button -->
     <div style="margin-bottom: 2rem;">
       <button onclick="showAddAdminModal()" class="btn btn-primary">+ Add Admin</button>
@@ -113,7 +145,143 @@
     </div>
   </div>
 
+  <style>
+    /* Radio Card Styles */
+    .llm-provider-selection {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1rem;
+      margin-bottom: 1rem;
+    }
+
+    @media (max-width: 768px) {
+      .llm-provider-selection {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .radio-card {
+      position: relative;
+      padding: 1.5rem;
+      border: 2px solid #e5e7eb;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      background: white;
+      display: block;
+    }
+
+    .radio-card:hover {
+      border-color: #4f46e5;
+      box-shadow: 0 4px 6px rgba(79, 70, 229, 0.1);
+    }
+
+    .radio-card.active {
+      border-color: #4f46e5;
+      background: #eef2ff;
+      box-shadow: 0 4px 6px rgba(79, 70, 229, 0.2);
+    }
+
+    .radio-card input[type="radio"] {
+      position: absolute;
+      opacity: 0;
+    }
+
+    .radio-card-content {
+      position: relative;
+    }
+
+    .radio-card-header {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      margin-bottom: 0.5rem;
+    }
+
+    .radio-card-icon {
+      font-size: 1.5rem;
+    }
+
+    .radio-card h3 {
+      margin: 0;
+      font-size: 1.125rem;
+      font-weight: 600;
+      color: #111827;
+    }
+
+    .radio-card p {
+      margin: 0;
+      font-size: 0.875rem;
+      color: #6b7280;
+      line-height: 1.5;
+    }
+
+    .radio-card.active h3 {
+      color: #4f46e5;
+    }
+
+    .radio-card.active::after {
+      content: '✓';
+      position: absolute;
+      top: 1rem;
+      right: 1rem;
+      width: 24px;
+      height: 24px;
+      background: #4f46e5;
+      color: white;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: bold;
+      font-size: 14px;
+    }
+  </style>
+
   <script>
+    // Update LLM Provider
+    async function updateLLMProvider(provider) {
+      const statusMessage = document.getElementById('llmStatusMessage');
+
+      try {
+        const response = await fetch('/api/organization/settings/llm-provider', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ llm_provider: provider })
+        });
+
+        if (response.ok) {
+          // Update UI
+          document.querySelectorAll('.radio-card').forEach(card => card.classList.remove('active'));
+          document.querySelector(`input[value="${provider}"]`).closest('.radio-card').classList.add('active');
+
+          // Show success message
+          statusMessage.style.display = 'block';
+          statusMessage.style.background = '#d1fae5';
+          statusMessage.style.color = '#065f46';
+          statusMessage.style.border = '1px solid #10b981';
+          statusMessage.textContent = `✅ Successfully switched to ${provider === 'openai' ? 'OpenAI GPT-5 Mini' : 'Claude Opus 4.5'}`;
+
+          setTimeout(() => {
+            statusMessage.style.display = 'none';
+          }, 3000);
+        } else {
+          throw new Error('Failed to update LLM provider');
+        }
+      } catch (error) {
+        console.error('Error:', error);
+        statusMessage.style.display = 'block';
+        statusMessage.style.background = '#fee2e2';
+        statusMessage.style.color = '#991b1b';
+        statusMessage.style.border = '1px solid #ef4444';
+        statusMessage.textContent = '❌ Error updating LLM provider. Please try again.';
+
+        setTimeout(() => {
+          statusMessage.style.display = 'none';
+        }, 3000);
+      }
+    }
+
     function showAddAdminModal() {
       document.getElementById('addAdminModal').style.display = 'flex';
     }

@@ -93,6 +93,7 @@ app.use('/dashboard', require('./routes/dashboard'));
 app.use('/admin', require('./routes/admin'));
 app.use('/api/employees', require('./routes/employees'));
 app.use('/api/absences', require('./routes/absences'));
+app.use('/api/organization', require('./routes/organization'));
 app.use('/api/sms', require('./routes/sms'));
 app.use('/reports', require('./routes/reports'));
 

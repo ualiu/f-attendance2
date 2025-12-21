@@ -3,6 +3,7 @@ const router = express.Router();
 const { requireTenantAuth, ensureAdmin } = require('../middleware/auth');
 const { scopeQuery } = require('../utils/tenantHelper');
 const Employee = require('../models/Employee');
+const Organization = require('../models/Organization');
 
 // All admin routes require authentication + tenant scoping + admin role
 router.use(requireTenantAuth);
@@ -14,10 +15,13 @@ router.get('/employees', async (req, res) => {
     const employees = await Employee.find(scopeQuery(req.organizationId))
       .sort({ name: 1 });
 
+    const organization = await Organization.findById(req.organizationId);
+
     res.render('admin/manage', {
-      title: 'Employee Management',
+      title: 'Admin Management',
       user: req.user,
-      employees
+      employees,
+      organization
     });
   } catch (error) {
     console.error('Error loading employees:', error);

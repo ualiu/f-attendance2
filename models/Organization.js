@@ -51,6 +51,11 @@ const organizationSchema = new mongoose.Schema({
     max_employees: {
       type: Number,
       default: 500
+    },
+    llm_provider: {
+      type: String,
+      enum: ['claude', 'openai'],
+      default: 'claude'
     }
   },
 

@@ -37,7 +37,7 @@ exports.getConversationState = (phoneNumber) => {
 };
 
 // Update conversation state
-exports.updateConversationState = (phoneNumber, messageBody, parsedData, questionAsked = null) => {
+exports.updateConversationState = (phoneNumber, messageBody, parsedData, questionAsked = null, transcript = null) => {
   const existing = recentConversations.get(phoneNumber) || {
     messages: [],
     collectedInfo: {},
@@ -50,6 +50,13 @@ exports.updateConversationState = (phoneNumber, messageBody, parsedData, questio
       text: messageBody,
       timestamp: Date.now()
     });
+  }
+
+  // Preserve transcript if passed in (to avoid losing it on reassignment)
+  if (transcript) {
+    existing.transcript = transcript;
+  } else if (!existing.transcript) {
+    existing.transcript = [];
   }
 
   // Update collected info
@@ -209,13 +216,80 @@ Extract duration from MANY formats:
 • "sick" (without duration) → 480 minutes (full day)
 • "can't make it" (without duration) → 480 minutes
 
-DURATION-BASED CLASSIFICATION:
-• **< 2 hours (< 120 min)** → LATE (tardiness, coming in late)
-• **2-4 hours (120-240 min)** → HALF_DAY (extended absence)
-• **4+ hours (240+ min)** or "not coming in" → FULL_DAY
+🚨 CRITICAL: UNDERSTAND THE DIFFERENCE BETWEEN LATE vs ABSENCE 🚨
+
+**LATE** = Delayed arrival ONLY at START of shift (coming to work late)
+• Keywords: "running late", "be there soon", "stuck in traffic", "on my way"
+• "overslept", "leaving now", "15 min late", "gonna be late"
+• Context: Employee IS COMING TO WORK but will arrive late
+• THIS IS ONLY FOR MORNING/SHIFT START DELAYS!
+
+**ABSENCE** = Not present during work hours OR leaving during shift
+• Keywords: "away", "stepping out", "leaving early", "appointment", "gone"
+• "away from 1:30 to 2:30", "doctor appointment", "need to step out"
+• "sick", "not coming in", "taking time off"
+• Context: Employee is ABSENT from work (either mid-day, partial, or full day)
+
+🚨 MOST CRITICAL RULE 🚨:
+• "AWAY FROM X TO Y" = ALWAYS ABSENCE (half_day), NEVER late!
+• "I'm away afternoon from 1:30 to 2:30" = ABSENCE (half_day)
+• "Stepping out for appointment" = ABSENCE
+• "Away for 1 hour" = ABSENCE
+• ANY message with specific time ranges ("from X to Y") = ABSENCE
+
+CLASSIFICATION RULES:
+1. First, determine if it's LATE (arrival delay at shift start) or ABSENCE (mid-day/full-day)
+   • If message mentions "away", "stepping out", "leaving", or specific times → ABSENCE
+   • If message mentions "running late", "on my way", "stuck in traffic" → LATE
+2. If LATE → always type "late" (regardless of duration)
+3. If ABSENCE → classify by duration:
+   • < 2 hours (< 120 min) → "half_day" with subtype sick/personal
+   • 2-4 hours (120-240 min) → "half_day" with subtype sick/personal
+   • 4+ hours (240+ min) → "full_day" with subtype sick/personal
+
+EXAMPLES:
+• "running late 30 min" → LATE (arrival delay at shift start)
+• "away from 1:30 to 2:30 for appointment" → HALF_DAY (1 hour absence, NOT late!)
+• "I'm away afternoon from 1:30 to 2:30 because I have doctors appointment" → HALF_DAY (60 min, NOT late!)
+• "doctor appointment 1 hour" → HALF_DAY (1 hour absence during workday, NOT late!)
+• "stuck in traffic, be there in 1 hour" → LATE (arrival delay at shift start)
+• "stepping out for 3 hours" → HALF_DAY (3 hour mid-day absence)
+• "leaving early for appointment" → ABSENCE (type depends on duration)
+• "sick today" → FULL_DAY (full day absence)
 
 ═══════════════════════════════════════════════════════════════════
-COMPREHENSIVE SCENARIO DETECTION
+DATE DETECTION - HANDLE TOMORROW AND FUTURE DATES
+═══════════════════════════════════════════════════════════════════
+
+Extract the date reference from messages:
+
+**TODAY (default):**
+• "today" / "this morning" / "right now" / "currently" / "can't come in"
+• "I'll be late" / "running late" / "sick" (no time reference)
+• Any message without a future date reference → default to "today"
+
+**TOMORROW:**
+• "tomorrow" / "tmrw" / "tmr" / "2morrow"
+• "tomorrow morning" / "tomorrow afternoon"
+• "won't be in tomorrow" / "late tomorrow"
+• "texting you tonight about tomorrow" / "evening before for tomorrow"
+
+**SPECIFIC DATES:**
+• "Monday" / "Tuesday" / "Wednesday" / "Thursday" / "Friday" / "Saturday" / "Sunday"
+• "next Monday" / "this Friday"
+• Actual dates: "12/25" / "December 25" / "Jan 5"
+
+**EXAMPLES:**
+• "I won't be coming in tomorrow" → date: "tomorrow"
+• "tomorrow I'll be late" → date: "tomorrow"
+• "sick tomorrow" → date: "tomorrow"
+• "texting tonight - won't be in tomorrow" → date: "tomorrow"
+• "I'll be late this morning" → date: "today"
+• "running late" → date: "today" (default)
+• "won't be in Monday" → date: "Monday"
+
+═══════════════════════════════════════════════════════════════════
+COMPREHENSIVE SCENARIO DETECTION (for context only - DURATION rules above)
 ═══════════════════════════════════════════════════════════════════
 
 **LATE** (coming to work, just delayed < 2 hours):
@@ -235,21 +309,24 @@ Already on way:
 • "be there soon" / "on my way" / "almost there" / "5 min away"
 • "leaving now" / "just left" / "headed in" / "en route"
 
-Any duration < 2 hours = LATE
+Short appointments (< 2 hours):
+• "quick appointment" / "1 hour appointment" / "doctor for an hour"
+
+Any duration < 120 min = LATE
 
 **HALF_DAY** (extended absence 2-4 hours):
 
-Mid-day appointments:
-• "need to step out" / "have to leave early" / "leaving at noon"
-• "doctor appointment" / "dentist" / "appointment at..."
-• "have an appointment" / "gotta run an errand"
+Extended appointments (2-4 hours):
+• "need to step out for a few hours" / "have to leave early"
+• "doctor appointment" (with 2-4 hour duration)
+• "long appointment" / "extended appointment"
 
 Partial day:
-• "coming in late" + duration > 2 hours
+• "coming in late" + duration 120-240 minutes
 • "half day" / "partial day" / "few hours"
 • "be gone for a while" / "out for a bit"
 
-Any duration 2-4 hours = HALF_DAY
+Any duration 120-240 min = HALF_DAY
 
 **FULL_DAY - SICK** (health-related full day absence):
 
@@ -326,25 +403,25 @@ COMPREHENSIVE EXAMPLES - LEARN THESE PATTERNS
 **EDGE CASE EXAMPLES:**
 
 1. "3 hours. Need to do groceries."
-→ {"type": "half_day", "subtype": "personal", "reason": "Groceries", "duration_minutes": 180, "has_duration": true, "has_reason": true, "missing_duration": false, "missing_reason": false}
+→ {"type": "half_day", "subtype": "personal", "reason": "Groceries", "duration_minutes": 180, "date": "today", "has_duration": true, "has_reason": true, "missing_duration": false, "missing_reason": false}
 
 2. "RUNNING LATE TRAFFIC BAD" (all caps, no punctuation)
-→ {"type": "late", "subtype": null, "reason": "Traffic", "duration_minutes": null, "has_duration": false, "has_reason": true, "missing_duration": true, "missing_reason": false}
+→ {"type": "late", "subtype": null, "reason": "Traffic", "duration_minutes": null, "date": "today", "has_duration": false, "has_reason": true, "missing_duration": true, "missing_reason": false}
 
 3. "cant come in sicl with flu" (typos)
-→ {"type": "full_day", "subtype": "sick", "reason": "Flu", "duration_minutes": 480, "has_duration": true, "has_reason": true, "missing_duration": false, "missing_reason": false}
+→ {"type": "full_day", "subtype": "sick", "reason": "Flu", "duration_minutes": 480, "date": "today", "has_duration": true, "has_reason": true, "missing_duration": false, "missing_reason": false}
 
 4. "gonna b late 2hrs trafic" (text speak, typo)
-→ {"type": "half_day", "subtype": "personal", "reason": "Traffic", "duration_minutes": 120, "has_duration": true, "has_reason": true, "missing_duration": false, "missing_reason": false}
+→ {"type": "half_day", "subtype": "personal", "reason": "Traffic", "duration_minutes": 120, "date": "today", "has_duration": true, "has_reason": true, "missing_duration": false, "missing_reason": false}
 
 5. "😷 sick today" (emoji)
-→ {"type": "full_day", "subtype": "sick", "reason": "Sick", "duration_minutes": 480, "has_duration": true, "has_reason": true, "missing_duration": false, "missing_reason": false}
+→ {"type": "full_day", "subtype": "sick", "reason": "Sick", "duration_minutes": 480, "date": "today", "has_duration": true, "has_reason": true, "missing_duration": false, "missing_reason": false}
 
 6. "car broke down. be there in an hour" (compound)
-→ {"type": "late", "subtype": null, "reason": "Car broke down", "duration_minutes": 60, "has_duration": true, "has_reason": true, "missing_duration": false, "missing_reason": false}
+→ {"type": "late", "subtype": null, "reason": "Car broke down", "duration_minutes": 60, "date": "today", "has_duration": true, "has_reason": true, "missing_duration": false, "missing_reason": false}
 
-7. "Dr appt tmrw 3hrs" (abbreviations)
-→ {"type": "half_day", "subtype": "personal", "reason": "Doctor appointment", "duration_minutes": 180, "has_duration": true, "has_reason": true, "missing_duration": false, "missing_reason": false}
+7. "Dr appt tmrw 3hrs" (abbreviations + tomorrow)
+→ {"type": "half_day", "subtype": "personal", "reason": "Doctor appointment", "duration_minutes": 180, "date": "tomorrow", "has_duration": true, "has_reason": true, "missing_duration": false, "missing_reason": false}
 
 8. "can i come in late? stuck in traffic" (question format)
 → {"type": "late", "subtype": null, "reason": "Traffic", "duration_minutes": null, "has_duration": false, "has_reason": true, "missing_duration": true, "missing_reason": false}
@@ -367,54 +444,81 @@ COMPREHENSIVE EXAMPLES - LEARN THESE PATTERNS
 14. "couple hours late groceries" (informal duration)
 → {"type": "half_day", "subtype": "personal", "reason": "Groceries", "duration_minutes": 120, "has_duration": true, "has_reason": true, "missing_duration": false, "missing_reason": false}
 
-15. "I will be late this morning" (no details)
-→ {"type": "late", "subtype": null, "reason": null, "duration_minutes": null, "has_duration": false, "has_reason": false, "missing_duration": true, "missing_reason": true}
+15. "I'll be away for an hour for an appointment" (1 hour mid-day absence = HALF_DAY)
+→ {"type": "half_day", "subtype": "personal", "reason": "Appointment", "duration_minutes": 60, "date": "today", "has_duration": true, "has_reason": true, "missing_duration": false, "missing_reason": false}
 
-16. "180 minutes" (just numbers - from follow-up)
-→ {"type": "half_day", "subtype": "personal", "reason": null, "duration_minutes": 180, "has_duration": true, "has_reason": false, "missing_duration": false, "missing_reason": true}
+16. "doctor appointment 1 hour" (1 hour mid-day absence = HALF_DAY)
+→ {"type": "half_day", "subtype": "personal", "reason": "Doctor appointment", "duration_minutes": 60, "date": "today", "has_duration": true, "has_reason": true, "missing_duration": false, "missing_reason": false}
 
-17. "30min" (compact format)
-→ {"type": "late", "subtype": null, "reason": null, "duration_minutes": 30, "has_duration": true, "has_reason": false, "missing_duration": false, "missing_reason": true}
+17. "away from 1:30 to 2:30 for doctors appointment" (specific time = mid-day ABSENCE = HALF_DAY, NOT late!)
+→ {"type": "half_day", "subtype": "personal", "reason": "Doctor appointment", "duration_minutes": 60, "date": "today", "has_duration": true, "has_reason": true, "missing_duration": false, "missing_reason": false}
 
-18. "half day appointment" (clear)
-→ {"type": "half_day", "subtype": "personal", "reason": "Appointment", "duration_minutes": 240, "has_duration": true, "has_reason": true, "missing_duration": false, "missing_reason": false}
+17b. "I'm away afternoon from 1:30 to 2:30 because I have doctors appointment" (mid-day ABSENCE = HALF_DAY, NOT late!)
+→ {"type": "half_day", "subtype": "personal", "reason": "Doctor appointment", "duration_minutes": 60, "date": "today", "has_duration": true, "has_reason": true, "missing_duration": false, "missing_reason": false}
 
-19. "leaving early family emergency" (urgent)
-→ {"type": "unclear_duration", "subtype": "personal", "reason": "Family emergency", "duration_minutes": null, "has_duration": false, "has_reason": true, "missing_duration": true, "missing_reason": false}
+18. "I will be late this morning" (arrival delay at shift start, no details)
+→ {"type": "late", "subtype": null, "reason": null, "duration_minutes": null, "date": "today", "has_duration": false, "has_reason": false, "missing_duration": true, "missing_reason": true}
 
-20. "throwing up all night cant come in" (sick detail)
-→ {"type": "full_day", "subtype": "sick", "reason": "Throwing up", "duration_minutes": 480, "has_duration": true, "has_reason": true, "missing_duration": false, "missing_reason": false}
+19. "stuck in traffic, be there in 1 hour" (arrival delay at shift start = LATE, not absence!)
+→ {"type": "late", "subtype": null, "reason": "Traffic", "duration_minutes": 60, "date": "today", "has_duration": true, "has_reason": true, "missing_duration": false, "missing_reason": false}
 
-21. "1-2 hours late" (range)
-→ {"type": "late", "subtype": null, "reason": null, "duration_minutes": 90, "has_duration": true, "has_reason": false, "missing_duration": false, "missing_reason": true}
+20. "180 minutes" (just numbers - from follow-up)
+→ {"type": "half_day", "subtype": "personal", "reason": null, "duration_minutes": 180, "date": "today", "has_duration": true, "has_reason": false, "missing_duration": false, "missing_reason": true}
 
-22. "not coming in today personal matter" (clear absence)
-→ {"type": "full_day", "subtype": "personal", "reason": "Personal matter", "duration_minutes": 480, "has_duration": true, "has_reason": true, "missing_duration": false, "missing_reason": false}
+21. "30min" (compact format - arrival delay)
+→ {"type": "late", "subtype": null, "reason": null, "duration_minutes": 30, "date": "today", "has_duration": true, "has_reason": false, "missing_duration": false, "missing_reason": true}
 
-23. "on my way just 15 late traffic" (already coming)
-→ {"type": "late", "subtype": null, "reason": "Traffic", "duration_minutes": 15, "has_duration": true, "has_reason": true, "missing_duration": false, "missing_reason": false}
+22. "half day appointment" (clear)
+→ {"type": "half_day", "subtype": "personal", "reason": "Appointment", "duration_minutes": 240, "date": "today", "has_duration": true, "has_reason": true, "missing_duration": false, "missing_reason": false}
 
-24. "taking the day mental health" (mental health)
-→ {"type": "full_day", "subtype": "personal", "reason": "Mental health day", "duration_minutes": 480, "has_duration": true, "has_reason": true, "missing_duration": false, "missing_reason": false}
+23. "leaving early family emergency" (urgent)
+→ {"type": "unclear_duration", "subtype": "personal", "reason": "Family emergency", "duration_minutes": null, "date": "today", "has_duration": false, "has_reason": true, "missing_duration": true, "missing_reason": false}
 
-25. "court today" (legal)
-→ {"type": "full_day", "subtype": "personal", "reason": "Court", "duration_minutes": 480, "has_duration": true, "has_reason": true, "missing_duration": false, "missing_reason": false}
+24. "throwing up all night cant come in" (sick detail)
+→ {"type": "full_day", "subtype": "sick", "reason": "Throwing up", "duration_minutes": 480, "date": "today", "has_duration": true, "has_reason": true, "missing_duration": false, "missing_reason": false}
+
+25. "1-2 hours late" (range - arrival delay)
+→ {"type": "late", "subtype": null, "reason": null, "duration_minutes": 90, "date": "today", "has_duration": true, "has_reason": false, "missing_duration": false, "missing_reason": true}
+
+26. "not coming in today personal matter" (clear absence)
+→ {"type": "full_day", "subtype": "personal", "reason": "Personal matter", "duration_minutes": 480, "date": "today", "has_duration": true, "has_reason": true, "missing_duration": false, "missing_reason": false}
+
+27. "on my way just 15 late traffic" (arrival delay - already coming)
+→ {"type": "late", "subtype": null, "reason": "Traffic", "duration_minutes": 15, "date": "today", "has_duration": true, "has_reason": true, "missing_duration": false, "missing_reason": false}
+
+28. "taking the day mental health" (mental health)
+→ {"type": "full_day", "subtype": "personal", "reason": "Mental health day", "duration_minutes": 480, "date": "today", "has_duration": true, "has_reason": true, "missing_duration": false, "missing_reason": false}
+
+27. "court today" (legal)
+→ {"type": "full_day", "subtype": "personal", "reason": "Court", "duration_minutes": 480, "date": "today", "has_duration": true, "has_reason": true, "missing_duration": false, "missing_reason": false}
+
+28. "won't be coming in tomorrow" (tomorrow reference)
+→ {"type": "full_day", "subtype": "personal", "reason": null, "duration_minutes": 480, "date": "tomorrow", "has_duration": true, "has_reason": false, "missing_duration": false, "missing_reason": true}
+
+29. "tomorrow I'll be late" (future date + late)
+→ {"type": "late", "subtype": null, "reason": null, "duration_minutes": null, "date": "tomorrow", "has_duration": false, "has_reason": false, "missing_duration": true, "missing_reason": true}
+
+30. "texting tonight - sick tomorrow" (evening before for tomorrow)
+→ {"type": "full_day", "subtype": "sick", "reason": "Sick", "duration_minutes": 480, "date": "tomorrow", "has_duration": true, "has_reason": true, "missing_duration": false, "missing_reason": false}
+
+31. "1 hour late tomorrow for appointment" (tomorrow + duration)
+→ {"type": "late", "subtype": null, "reason": "Appointment", "duration_minutes": 60, "date": "tomorrow", "has_duration": true, "has_reason": true, "missing_duration": false, "missing_reason": false}
 
 **FOLLOW-UP MESSAGE EXAMPLES (when conversation history exists):**
 
-26. Current message: "1 hour" (after being asked "how late will you be?")
+28. Current message: "1 hour" (after being asked "how late will you be?")
 → {"type": "late", "subtype": null, "reason": null, "duration_minutes": 60, "has_duration": true, "has_reason": false, "missing_duration": false, "missing_reason": true}
 
-27. Current message: "groceries" (after being asked "why are you running late?")
+29. Current message: "groceries" (after being asked "why are you running late?")
 → {"type": "late", "subtype": null, "reason": "Groceries", "duration_minutes": null, "has_duration": false, "has_reason": true, "missing_duration": false, "missing_reason": false}
 
-28. Current message: "traffic" (when we already have duration from previous message)
+30. Current message: "traffic" (when we already have duration from previous message)
 → {"type": "late", "subtype": null, "reason": "Traffic", "duration_minutes": null, "has_duration": false, "has_reason": true, "missing_duration": false, "missing_reason": false}
 
-29. Current message: "2 hours" (after being asked "how long will you be out?")
+31. Current message: "2 hours" (after being asked "how long will you be out?")
 → {"type": "half_day", "subtype": "personal", "reason": null, "duration_minutes": 120, "has_duration": true, "has_reason": false, "missing_duration": false, "missing_reason": true}
 
-30. Current message: "doctor appointment" (when we already have duration from conversation)
+32. Current message: "doctor appointment" (when we already have duration from conversation)
 → {"type": null, "subtype": "personal", "reason": "Doctor appointment", "duration_minutes": null, "has_duration": false, "has_reason": true, "missing_duration": false, "missing_reason": false}
 
 ══════════════════════════════════════════════════════════════════
@@ -428,6 +532,7 @@ YOU MUST respond with ONLY valid JSON. Start with { and end with }.
   "subtype": "sick|personal|null",
   "reason": "extracted reason or null",
   "duration_minutes": number or null,
+  "date": "today|tomorrow|Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday|specific date",
   "has_duration": boolean,
   "has_reason": boolean,
   "missing_duration": boolean,
@@ -439,6 +544,7 @@ Field Definitions:
 • subtype: For full_day/half_day, is it "sick" or "personal"? null for late
 • reason: The specific reason extracted from message, or null
 • duration_minutes: Extracted duration in minutes, or null
+• date: Date reference ("today", "tomorrow", day name, or specific date). Default to "today" if not specified
 • has_duration: true if any duration info found (even implied like "all day")
 • has_reason: true if any reason found (even minimal like "traffic")
 • missing_duration: true if we need to ask for duration
@@ -570,6 +676,9 @@ RESPOND WITH JSON ONLY - NO EXPLANATIONS!`;
 // Log absence from SMS
 exports.logAbsenceFromSMS = async ({ employee, parsedData, originalMessage, phoneNumber, transcript = [] }) => {
   try {
+    console.log('   💾 logAbsenceFromSMS called with transcript length:', transcript.length);
+    console.log('   💾 Transcript content:', JSON.stringify(transcript, null, 2));
+
     const callTime = new Date();
     const noticeCheck = attendanceService.checkNoticeTime(employee, callTime);
 
@@ -588,6 +697,26 @@ exports.logAbsenceFromSMS = async ({ employee, parsedData, originalMessage, phon
       absenceType = parsedData.subtype || 'sick'; // Use subtype (sick/personal)
     }
 
+    // Calculate actual absence date based on extracted date
+    let absenceDate = new Date();
+    absenceDate.setHours(0, 0, 0, 0); // Reset to start of day
+
+    const dateRef = parsedData.date || 'today';
+
+    if (dateRef === 'tomorrow') {
+      // Add 1 day
+      absenceDate.setDate(absenceDate.getDate() + 1);
+    } else if (['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'].includes(dateRef)) {
+      // Calculate next occurrence of this day
+      const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+      const targetDay = dayNames.indexOf(dateRef);
+      const currentDay = absenceDate.getDay();
+      let daysToAdd = targetDay - currentDay;
+      if (daysToAdd <= 0) daysToAdd += 7; // If day has passed this week, go to next week
+      absenceDate.setDate(absenceDate.getDate() + daysToAdd);
+    }
+    // Otherwise use today (default)
+
     // Format reason with duration info
     let formattedReason = parsedData.reason || 'No reason provided';
     if (parsedData.type === 'late' && duration > 0) {
@@ -600,7 +729,7 @@ exports.logAbsenceFromSMS = async ({ employee, parsedData, originalMessage, phon
     const absence = await Absence.create({
       employee_id: employee._id,
       employee_name: employee.name,
-      date: new Date(),
+      date: absenceDate, // Use calculated date instead of new Date()
       type: absenceType,
       reason: formattedReason,
       expected_return: null, // Can be added later if needed
@@ -617,6 +746,9 @@ exports.logAbsenceFromSMS = async ({ employee, parsedData, originalMessage, phon
     console.log(`   Employee: ${employee.name}`);
     console.log(`   Type: ${absenceType} (${parsedData.type})`);
     console.log(`   Duration: ${duration} minutes`);
+    console.log(`   Date: ${absenceDate.toLocaleDateString()} (${dateRef})`);
+    console.log(`   💾 Saved transcript length: ${absence.conversation_transcript?.length || 0}`);
+    console.log(`   💾 Saved transcript:`, JSON.stringify(absence.conversation_transcript, null, 2));
 
     return absence;
 

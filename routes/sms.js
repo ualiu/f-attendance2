@@ -4,7 +4,8 @@ const twilio = require('twilio');
 const Employee = require('../models/Employee');
 const Absence = require('../models/Absence');
 const Organization = require('../models/Organization');
-const smsService = require('../services/smsService');
+const smsServiceClaude = require('../services/smsService');
+const smsServiceOpenAI = require('../services/smsServiceOpenAI');
 
 // Twilio webhook for incoming SMS
 router.post('/incoming', async (req, res) => {
@@ -47,6 +48,11 @@ router.post('/incoming', async (req, res) => {
     const organization = await Organization.findById(employee.organization_id);
     const organizationName = organization ? organization.name : 'your company';
 
+    // Determine which LLM service to use based on organization settings
+    const llmProvider = organization?.settings?.llm_provider || 'claude';
+    const smsService = llmProvider === 'openai' ? smsServiceOpenAI : smsServiceClaude;
+    console.log(`   🤖 Using LLM provider: ${llmProvider.toUpperCase()}`);
+
     // Get conversation state (if this is a follow-up)
     let conversationState = smsService.getConversationState(phoneNumber);
     const isFollowUp = conversationState !== null;
@@ -70,9 +76,12 @@ router.post('/incoming', async (req, res) => {
       message: messageBody,
       timestamp: new Date()
     });
+    console.log('   📝 Added employee message to transcript. Transcript length:', conversationState.transcript.length);
+    console.log('   📝 Transcript contents:', JSON.stringify(conversationState.transcript, null, 2));
 
-    // Add current message to conversation state (before parsing)
-    conversationState = smsService.updateConversationState(phoneNumber, messageBody, null);
+    // Add current message to conversation state (before parsing) - pass transcript to preserve it
+    conversationState = smsService.updateConversationState(phoneNumber, messageBody, null, null, conversationState.transcript);
+    console.log('   📝 After updateConversationState. Transcript length:', conversationState.transcript.length);
 
     // Parse the SMS message using Claude LLM with conversation context
     const parsedData = await smsService.parseAttendanceMessage(messageBody, employee, organizationName, conversationState);
@@ -140,8 +149,7 @@ router.post('/incoming', async (req, res) => {
       });
 
       // Update conversation state with parsed data, question asked, and transcript
-      conversationState = smsService.updateConversationState(phoneNumber, null, parsedData, questionAsked);
-      conversationState.transcript = conversationState.transcript || [];
+      conversationState = smsService.updateConversationState(phoneNumber, null, parsedData, questionAsked, conversationState.transcript);
 
       twiml.message(followUpMessage);
       console.log('   📤 Follow-up message:', followUpMessage);
@@ -158,6 +166,8 @@ router.post('/incoming', async (req, res) => {
       message: responseMessage,
       timestamp: new Date()
     });
+    console.log('   📝 Before saving absence. Transcript length:', conversationState.transcript.length);
+    console.log('   📝 Full transcript:', JSON.stringify(conversationState.transcript, null, 2));
 
     // Create absence record with full conversation transcript
     const absence = await smsService.logAbsenceFromSMS({

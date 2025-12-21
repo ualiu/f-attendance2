@@ -142,9 +142,14 @@ router.get(
         role: { $in: ["super_admin", "admin"] },
       }).sort({ created_at: -1 });
 
+      // Get organization settings
+      const Organization = require('../models/Organization');
+      const organization = await Organization.findById(req.organizationId);
+
       res.render("admin/invite-admin", {
         user: req.user,
         admins,
+        organization,
       });
     } catch (error) {
       console.error("Error loading invite admin page:", error);
