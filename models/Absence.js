@@ -62,6 +62,14 @@ const absenceSchema = new mongoose.Schema({
     type: String,
     default: null
   },
+  conversation_transcript: [{
+    from: {
+      type: String,
+      enum: ['employee', 'system']
+    },
+    message: String,
+    timestamp: Date
+  }],
 
   // Notifications
   supervisor_notified: {

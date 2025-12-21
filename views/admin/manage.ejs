@@ -30,13 +30,12 @@
             <th>Name</th>
             <th>Employee ID</th>
             <th>Shift</th>
-            <th>Actions</th>
           </tr>
         </thead>
         <tbody id="employeeTableBody">
           <% if (employees.length === 0) { %>
             <tr>
-              <td colspan="4" class="no-data">No employees yet. Add your first employee above.</td>
+              <td colspan="3" class="no-data">No employees yet. Add your first employee above.</td>
             </tr>
           <% } else { %>
             <% employees.forEach(emp => { %>
@@ -44,10 +43,6 @@
                 <td><a href="/dashboard/employee/<%= emp._id %>"><%= emp.name %></a></td>
                 <td><%= emp.employee_id %></td>
                 <td><%= emp.shift %></td>
-                <td>
-                  <button onclick="editEmployee('<%= emp._id %>')" class="btn-small">Edit</button>
-                  <button onclick="deleteEmployee('<%= emp._id %>')" class="btn-small btn-danger">Delete</button>
-                </td>
               </tr>
             <% }); %>
           <% } %>

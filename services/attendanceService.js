@@ -50,9 +50,28 @@ exports.getTodaysSummary = async (organizationId) => {
   })).populate('employee_id');
 
   const totalEmployees = await Employee.countDocuments(scopeQuery(organizationId));
-  const absentCount = todaysAbsences.filter(a => a.type !== 'late').length;
-  const lateCount = todaysAbsences.filter(a => a.type === 'late').length;
-  const presentCount = totalEmployees - absentCount - lateCount;
+
+  // Count unique employees (not total records) to handle multiple absences per employee
+  const uniqueEmployeesWithAbsences = new Set();
+  const uniqueLateEmployees = new Set();
+  const uniqueAbsentEmployees = new Set();
+
+  todaysAbsences.forEach(absence => {
+    const empId = absence.employee_id?._id?.toString() || absence.employee_id?.toString();
+    if (empId) {
+      uniqueEmployeesWithAbsences.add(empId);
+
+      if (absence.type === 'late') {
+        uniqueLateEmployees.add(empId);
+      } else {
+        uniqueAbsentEmployees.add(empId);
+      }
+    }
+  });
+
+  const absentCount = uniqueAbsentEmployees.size;
+  const lateCount = uniqueLateEmployees.size;
+  const presentCount = Math.max(0, totalEmployees - absentCount - lateCount); // Prevent negative
 
   return {
     totalEmployees,

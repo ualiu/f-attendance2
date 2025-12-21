@@ -11,12 +11,16 @@
   <%- include('../partials/sidebar') %>
 
   <main class="main-with-sidebar">
-    <div class="employee-header">
+    <div class="employee-header" style="display: flex; justify-content: space-between; align-items: center;">
       <div>
         <h1><%= employee.name %></h1>
         <p class="employee-meta">
           <%= employee.employee_id %> | <%= employee.shift %>
         </p>
+      </div>
+      <div style="display: flex; gap: 0.5rem;">
+        <button onclick="showEditModal()" class="btn btn-primary">Edit Employee</button>
+        <button onclick="deleteEmployee()" class="btn btn-danger">Delete Employee</button>
       </div>
     </div>
 
@@ -130,6 +134,43 @@
     </div>
   </main>
 
+  <!-- Edit Employee Modal -->
+  <div id="editEmployeeModal" class="modal" style="display: none;">
+    <div class="modal-content">
+      <h2>Edit Employee</h2>
+      <form id="editEmployeeForm" onsubmit="updateEmployee(event)">
+        <div class="form-group">
+          <label>Name</label>
+          <input type="text" name="name" id="edit_name" value="<%= employee.name %>" required>
+        </div>
+        <div class="form-group">
+          <label>Employee ID</label>
+          <input type="text" value="<%= employee.employee_id %>" disabled>
+        </div>
+        <div class="form-group">
+          <label>Phone</label>
+          <input type="tel" name="phone" id="edit_phone" value="<%= employee.phone %>" required>
+        </div>
+        <div class="form-group">
+          <label>Shift</label>
+          <select name="shift" id="edit_shift" required>
+            <option value="Day" <%= employee.shift === 'Day' ? 'selected' : '' %>>Day</option>
+            <option value="Night" <%= employee.shift === 'Night' ? 'selected' : '' %>>Night</option>
+            <option value="Weekend" <%= employee.shift === 'Weekend' ? 'selected' : '' %>>Weekend</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Start Date</label>
+          <input type="date" name="start_date" id="edit_start_date" value="<%= employee.start_date ? new Date(employee.start_date).toISOString().split('T')[0] : '' %>">
+        </div>
+        <div class="modal-actions">
+          <button type="submit" class="btn btn-primary">Update Employee</button>
+          <button type="button" onclick="closeEditModal()" class="btn btn-secondary">Cancel</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
   <script src="/js/dashboard.js"></script>
   <script src="/js/global.js"></script>
   <script>
@@ -217,6 +258,55 @@
         badge.textContent = formatAbsenceType(rawType);
       });
     });
+
+    // Show edit modal
+    function showEditModal() {
+      document.getElementById('editEmployeeModal').style.display = 'flex';
+    }
+
+    // Close edit modal
+    function closeEditModal() {
+      document.getElementById('editEmployeeModal').style.display = 'none';
+    }
+
+    // Update employee
+    async function updateEmployee(e) {
+      e.preventDefault();
+      const formData = new FormData(e.target);
+      const data = Object.fromEntries(formData);
+
+      const response = await fetch('/api/employees/<%= employee._id %>', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data)
+      });
+
+      if (response.ok) {
+        closeEditModal();
+        location.reload();
+      } else {
+        alert('Error updating employee');
+      }
+    }
+
+    // Delete employee
+    async function deleteEmployee() {
+      if (!confirm('Are you sure you want to delete <%= employee.name %>? This will also delete all absence records.')) return;
+
+      const response = await fetch('/api/employees/<%= employee._id %>', { method: 'DELETE' });
+      if (response.ok) {
+        window.location.href = '/admin/manage';
+      } else {
+        alert('Error deleting employee');
+      }
+    }
+
+    // Close modal when clicking outside
+    window.onclick = function(event) {
+      if (event.target.classList.contains('modal')) {
+        event.target.style.display = 'none';
+      }
+    }
   </script>
 </body>
 </html>

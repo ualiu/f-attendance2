@@ -55,6 +55,22 @@ router.post('/incoming', async (req, res) => {
       console.log('   💬 Conversation state:', JSON.stringify(conversationState.collectedInfo, null, 2));
     }
 
+    // Initialize transcript array if this is a new conversation
+    if (!conversationState || !conversationState.transcript) {
+      if (!conversationState) {
+        conversationState = { transcript: [] };
+      } else {
+        conversationState.transcript = [];
+      }
+    }
+
+    // Add employee message to transcript
+    conversationState.transcript.push({
+      from: 'employee',
+      message: messageBody,
+      timestamp: new Date()
+    });
+
     // Add current message to conversation state (before parsing)
     conversationState = smsService.updateConversationState(phoneNumber, messageBody, null);
 
@@ -116,8 +132,16 @@ router.post('/incoming', async (req, res) => {
         followUpMessage = `${greeting}please text something like: "Running 30 min late - traffic" or "Sick with flu" or "Out for appointment"`;
       }
 
-      // Update conversation state with parsed data and question asked
-      smsService.updateConversationState(phoneNumber, null, parsedData, questionAsked);
+      // Add system response to transcript
+      conversationState.transcript.push({
+        from: 'system',
+        message: followUpMessage,
+        timestamp: new Date()
+      });
+
+      // Update conversation state with parsed data, question asked, and transcript
+      conversationState = smsService.updateConversationState(phoneNumber, null, parsedData, questionAsked);
+      conversationState.transcript = conversationState.transcript || [];
 
       twiml.message(followUpMessage);
       console.log('   📤 Follow-up message:', followUpMessage);
@@ -127,12 +151,21 @@ router.post('/incoming', async (req, res) => {
       return res.send(twimlString);
     }
 
-    // Create absence record
+    // Add final system response to transcript before saving
+    const responseMessage = await smsService.generateResponseMessage(employee, null, parsedData);
+    conversationState.transcript.push({
+      from: 'system',
+      message: responseMessage,
+      timestamp: new Date()
+    });
+
+    // Create absence record with full conversation transcript
     const absence = await smsService.logAbsenceFromSMS({
       employee,
       parsedData,
       originalMessage: messageBody,
-      phoneNumber
+      phoneNumber,
+      transcript: conversationState.transcript
     });
 
     console.log('   ✅ Absence logged:', absence._id);
@@ -140,9 +173,6 @@ router.post('/incoming', async (req, res) => {
     // Clear conversation state since we successfully logged the absence
     smsService.clearConversation(phoneNumber);
     console.log('   🧹 Conversation cleared');
-
-    // Generate response message
-    const responseMessage = await smsService.generateResponseMessage(employee, absence, parsedData);
 
     console.log('   📤 Sending response:', responseMessage);
 

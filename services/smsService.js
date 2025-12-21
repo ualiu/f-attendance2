@@ -40,14 +40,17 @@ exports.getConversationState = (phoneNumber) => {
 exports.updateConversationState = (phoneNumber, messageBody, parsedData, questionAsked = null) => {
   const existing = recentConversations.get(phoneNumber) || {
     messages: [],
-    collectedInfo: {}
+    collectedInfo: {},
+    transcript: []
   };
 
   existing.timestamp = Date.now();
-  existing.messages.push({
-    text: messageBody,
-    timestamp: Date.now()
-  });
+  if (messageBody) {
+    existing.messages.push({
+      text: messageBody,
+      timestamp: Date.now()
+    });
+  }
 
   // Update collected info
   if (parsedData) {
@@ -565,7 +568,7 @@ RESPOND WITH JSON ONLY - NO EXPLANATIONS!`;
 };
 
 // Log absence from SMS
-exports.logAbsenceFromSMS = async ({ employee, parsedData, originalMessage, phoneNumber }) => {
+exports.logAbsenceFromSMS = async ({ employee, parsedData, originalMessage, phoneNumber, transcript = [] }) => {
   try {
     const callTime = new Date();
     const noticeCheck = attendanceService.checkNoticeTime(employee, callTime);
@@ -604,6 +607,7 @@ exports.logAbsenceFromSMS = async ({ employee, parsedData, originalMessage, phon
       report_time: callTime,
       report_method: 'sms',
       report_message: originalMessage,
+      conversation_transcript: transcript, // Full conversation history
       late_notice: noticeCheck.isLateNotice,
       organization_id: employee.organization_id // CRITICAL: Assign to employee's organization
     });

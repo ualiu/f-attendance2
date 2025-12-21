@@ -85,6 +85,19 @@
     </div>
   </main>
 
+  <!-- SMS Conversation Modal -->
+  <div id="smsModal" class="modal" style="display: none;">
+    <div class="modal-content" style="max-width: 700px;">
+      <h2>SMS Conversation Transcript</h2>
+      <div id="smsContent" style="background: #f8f9fa; padding: 1.5rem; border-radius: 8px; margin: 1rem 0; font-family: monospace; white-space: pre-wrap; max-height: 500px; overflow-y: auto; font-size: 13px; line-height: 1.6;">
+        Loading...
+      </div>
+      <div class="modal-actions">
+        <button type="button" onclick="closeSmsModal()" class="btn btn-secondary">Close</button>
+      </div>
+    </div>
+  </div>
+
   <script src="/js/dashboard.js"></script>
   <script src="/js/global.js"></script>
   <script>
@@ -112,6 +125,59 @@
         badge.textContent = formatAbsenceType(rawType);
       });
     });
+
+    // View SMS message
+    async function viewMessage(absenceId) {
+      const modal = document.getElementById('smsModal');
+      const content = document.getElementById('smsContent');
+
+      modal.style.display = 'flex';
+      content.textContent = 'Loading...';
+
+      try {
+        const response = await fetch(`/api/absences/${absenceId}`);
+        const data = await response.json();
+
+        if (data.success && data.absence) {
+          const absence = data.absence;
+          let messageHtml = `📱 SMS Conversation Transcript\n\n`;
+          messageHtml += `Employee: ${absence.employee_name}\n`;
+          messageHtml += `Time: ${new Date(absence.report_time).toLocaleString()}\n`;
+          messageHtml += `Method: ${absence.report_method || 'SMS'}\n`;
+          messageHtml += `\n${'─'.repeat(60)}\n\n`;
+
+          // Display full conversation if available
+          if (absence.conversation_transcript && absence.conversation_transcript.length > 0) {
+            absence.conversation_transcript.forEach((msg, index) => {
+              const time = new Date(msg.timestamp).toLocaleTimeString();
+              const prefix = msg.from === 'employee' ? '👤 Employee' : '🤖 System';
+              messageHtml += `[${time}] ${prefix}:\n${msg.message}\n\n`;
+            });
+          } else {
+            // Fallback to original message if no transcript
+            messageHtml += `Original Message:\n${absence.report_message || 'No message recorded'}`;
+          }
+
+          content.textContent = messageHtml;
+        } else {
+          content.textContent = 'Error loading message';
+        }
+      } catch (error) {
+        content.textContent = 'Error loading message: ' + error.message;
+      }
+    }
+
+    // Close SMS modal
+    function closeSmsModal() {
+      document.getElementById('smsModal').style.display = 'none';
+    }
+
+    // Close modal when clicking outside
+    window.onclick = function(event) {
+      if (event.target.classList.contains('modal')) {
+        event.target.style.display = 'none';
+      }
+    }
   </script>
 </body>
 </html>
