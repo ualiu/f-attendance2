@@ -412,7 +412,6 @@ RESPOND WITH JSON ONLY - NO EXPLANATIONS!`;
           },
         ],
         response_format: { type: "json_object" },
-        temperature: 0.3,
         max_completion_tokens: 500,
       });
     } catch (apiError) {

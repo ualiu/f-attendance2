@@ -6,25 +6,23 @@
         <span class="link-text">Dashboard</span>
       </a>
 
-      <% if (user && (user.role === 'admin' || user.role === 'super_admin')) { %>
-        <a href="/admin/employees" class="sidebar-link">
-          <span class="icon">👥</span>
-          <span class="link-text">Employees</span>
-        </a>
-      <% } %>
-
-      <% if (user && user.role === 'super_admin') { %>
-        <a href="/admin/invite-admin" class="sidebar-link">
-          <span class="icon">➕</span>
-          <span class="link-text">Invite Admin</span>
-        </a>
-      <% } %>
-
-      <% if (user && (user.role === 'admin' || user.role === 'super_admin')) { %>
-        <a href="/reports" class="sidebar-link">
-          <span class="icon">📈</span>
-          <span class="link-text">Reports</span>
-        </a>
+      <% if (user && (user.role === 'admin' || user.role === 'super_admin')) {
+      %>
+      <a href="/admin/employees" class="sidebar-link">
+        <span class="icon">👥</span>
+        <span class="link-text">Employees</span>
+      </a>
+      <% } %> <% if (user && (user.role === 'admin' || user.role ===
+      'super_admin')) { %>
+      <a href="/reports" class="sidebar-link">
+        <span class="icon">📈</span>
+        <span class="link-text">Reports</span>
+      </a>
+      <% } %> <% if (user && user.role === 'super_admin') { %>
+      <a href="/admin/invite-admin" class="sidebar-link">
+        <span class="icon">➕</span>
+        <span class="link-text">Account Settings</span>
+      </a>
       <% } %>
     </div>
 
