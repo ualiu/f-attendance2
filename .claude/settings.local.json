@@ -14,7 +14,9 @@
       "Bash(node scripts/check-db-status.js:*)",
       "Bash(grep:*)",
       "Bash(node scripts/drop-username-index.js:*)",
-      "Bash(node scripts/add-phone-unique-index.js:*)"
+      "Bash(node scripts/add-phone-unique-index.js:*)",
+      "WebFetch(domain:platform.openai.com)",
+      "WebSearch"
     ],
     "deny": [],
     "ask": []

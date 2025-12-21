@@ -396,23 +396,61 @@ RESPOND WITH JSON ONLY - NO EXPLANATIONS!`;
     console.log("   🔄 Calling OpenAI API (GPT-5 Mini)...");
     console.log("   📝 Message to parse:", messageBody);
 
-    let completion;
+    let response;
     try {
-      completion = await openai.chat.completions.create({
+      response = await openai.responses.create({
         model: "gpt-5-mini",
-        messages: [
+        input: [
           {
             role: "system",
-            content:
-              "You are an attendance assistant. Parse employee absence/late messages and respond with ONLY valid JSON. No explanations, no markdown code blocks, just raw JSON.",
+            content: prompt,
           },
           {
             role: "user",
-            content: prompt,
+            content: messageBody,
           },
         ],
-        response_format: { type: "json_object" },
-        max_completion_tokens: 500,
+        response_format: {
+          type: "json_schema",
+          json_schema: {
+            name: "attendance_report",
+            schema: {
+              type: "object",
+              properties: {
+                type: {
+                  type: "string",
+                  enum: ["late", "short_absence", "half_day", "full_day", "unclear", "unclear_duration"]
+                },
+                subtype: {
+                  type: ["string", "null"],
+                  enum: ["sick", "personal", null]
+                },
+                reason: {
+                  type: ["string", "null"]
+                },
+                duration_minutes: {
+                  type: ["number", "null"]
+                },
+                date: {
+                  type: "string"
+                },
+                has_duration: {
+                  type: "boolean"
+                },
+                has_reason: {
+                  type: "boolean"
+                },
+                missing_duration: {
+                  type: "boolean"
+                },
+                missing_reason: {
+                  type: "boolean"
+                }
+              },
+              required: ["type", "has_duration", "has_reason", "missing_duration", "missing_reason"]
+            }
+          }
+        }
       });
     } catch (apiError) {
       console.error("   ❌ OpenAI API call failed:", apiError.message);
@@ -426,22 +464,11 @@ RESPOND WITH JSON ONLY - NO EXPLANATIONS!`;
     }
 
     console.log("   ✅ OpenAI API responded");
-    let responseText = completion.choices[0].message.content;
-    console.log("   🤖 OpenAI response:", responseText);
+    console.log("   🔍 Full response object:", JSON.stringify(response, null, 2));
 
-    // Strip markdown code blocks if present (same as Claude service)
-    responseText = responseText.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
-
-    // Extract JSON from response (sometimes OpenAI adds explanation before JSON)
-    const jsonMatch = responseText.match(/\{[\s\S]*\}/);
-    if (jsonMatch) {
-      responseText = jsonMatch[0];
-    }
-
-    console.log("   📋 Cleaned response:", responseText);
-
-    // Parse JSON response
-    const parsed = JSON.parse(responseText);
+    // GPT-5 returns structured data directly in response.output
+    const parsed = response.output;
+    console.log("   🤖 OpenAI parsed data:", JSON.stringify(parsed, null, 2));
 
     console.log("   📊 Parsed data:", JSON.stringify(parsed, null, 2));
 
