@@ -1,183 +1,289 @@
 <!DOCTYPE html>
 <html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title><%= title %> - Felton Brushes</title>
-  <link rel="stylesheet" href="/css/style.css">
-</head>
-<body>
-  <%- include('../partials/header') %>
-  <%- include('../partials/sidebar') %>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title><%= title %> - Felton Brushes</title>
+    <link rel="stylesheet" href="/css/style.css" />
+  </head>
+  <body>
+    <%- include('../partials/header') %> <%- include('../partials/sidebar') %>
 
-  <main class="main-with-sidebar">
-    <div class="dashboard-header">
-      <h1><%= title %></h1>
-      <div class="date-info">
-        <%= new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }) %>
-      </div>
-    </div>
-
-    <!-- Today's Summary -->
-    <div class="stats-grid">
-      <div class="stat-card">
-        <h3>Total Employees</h3>
-        <div class="stat-value"><%= todaysSummary.totalEmployees %></div>
+    <main class="main-with-sidebar">
+      <div class="dashboard-header">
+        <h1><%= title %></h1>
+        <div class="date-info" id="dashboardDate">
+          Loading...
+        </div>
       </div>
 
-      <div class="stat-card stat-success">
-        <h3>Present Today</h3>
-        <div class="stat-value"><%= todaysSummary.presentCount %></div>
+      <!-- Today's Summary -->
+      <div class="stats-grid">
+        <div class="stat-card">
+          <h3>Total Employees</h3>
+          <div class="stat-value"><%= todaysSummary.totalEmployees %></div>
+        </div>
+
+        <div class="stat-card stat-success">
+          <h3>Present Today</h3>
+          <div class="stat-value"><%= todaysSummary.presentCount %></div>
+        </div>
+
+        <div class="stat-card stat-warning">
+          <h3>Absent Today</h3>
+          <div class="stat-value"><%= todaysSummary.absentCount %></div>
+        </div>
+
+        <div class="stat-card stat-info">
+          <h3>Late Today</h3>
+          <div class="stat-value"><%= todaysSummary.lateCount %></div>
+        </div>
       </div>
 
-      <div class="stat-card stat-warning">
-        <h3>Absent Today</h3>
-        <div class="stat-value"><%= todaysSummary.absentCount %></div>
-      </div>
-
-      <div class="stat-card stat-info">
-        <h3>Late Today</h3>
-        <div class="stat-value"><%= todaysSummary.lateCount %></div>
-      </div>
-    </div>
-
-    <!-- Recent Reports -->
-    <div class="recent-absences-section">
-      <h2>Recent Absence Reports</h2>
-      <div class="table-responsive">
-        <table class="absences-table">
-        <thead>
-          <tr>
-            <th>Time</th>
-            <th>Employee</th>
-            <th>Type</th>
-            <th>Reason</th>
-            <th>Actions</th>
-          </tr>
-        </thead>
-        <tbody>
-          <% if (recentAbsences.length === 0) { %>
-            <tr>
-              <td colspan="5" class="no-data">No recent reports</td>
-            </tr>
-          <% } else { %>
-            <% recentAbsences.forEach(absence => { %>
+      <!-- Recent Reports -->
+      <div class="recent-absences-section">
+        <h2>Recent Absence Reports</h2>
+        <div class="table-responsive">
+          <table class="absences-table">
+            <thead>
               <tr>
-                <td><%= absence.report_time ? new Date(absence.report_time).toLocaleString() : 'N/A' %></td>
+                <th>Time</th>
+                <th>Employee</th>
+                <th>Type</th>
+                <th>Reason</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              <% if (recentAbsences.length === 0) { %>
+              <tr>
+                <td colspan="5" class="no-data">No recent reports</td>
+              </tr>
+              <% } else { %> <% recentAbsences.forEach(absence => { %>
+              <tr>
+                <td class="date-time-cell" data-timestamp="<%= absence.report_time || '' %>">
+                  <%= absence.report_time ? new
+                  Date(absence.report_time).toLocaleString() : 'N/A' %>
+                </td>
                 <td>
                   <a href="/dashboard/employee/<%= absence.employee_id?._id %>">
                     <%= absence.employee_name %>
                   </a>
                 </td>
-                <td><span class="type-badge type-<%= absence.type %>"><%= absence.type %></span></td>
+                <td>
+                  <span class="type-badge type-<%= absence.type %>"
+                    ><%= absence.type %></span
+                  >
+                </td>
                 <td><%= absence.reason %></td>
                 <td>
                   <% if (absence.report_message) { %>
-                    <button onclick="viewMessage('<%= absence._id %>')" class="btn-small">View</button>
+                  <button
+                    onclick="viewMessage('<%= absence._id %>')"
+                    class="btn-small"
+                  >
+                    View SMS
+                  </button>
                   <% } %>
                 </td>
               </tr>
-            <% }); %>
-          <% } %>
-        </tbody>
-      </table>
+              <% }); %> <% } %>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </main>
+
+    <!-- SMS Conversation Modal -->
+    <div id="smsModal" class="modal" style="display: none">
+      <div class="modal-content" style="max-width: 700px">
+        <h2>SMS Conversation Transcript</h2>
+        <div
+          id="smsContent"
+          style="
+            background: #f8f9fa;
+            padding: 1.5rem;
+            border-radius: 8px;
+            margin: 1rem 0;
+            font-family: monospace;
+            white-space: pre-wrap;
+            max-height: 500px;
+            overflow-y: auto;
+            font-size: 13px;
+            line-height: 1.6;
+          "
+        >
+          Loading...
+        </div>
+        <div class="modal-actions">
+          <button
+            type="button"
+            onclick="closeSmsModal()"
+            class="btn btn-secondary"
+          >
+            Close
+          </button>
+        </div>
       </div>
     </div>
-  </main>
 
-  <!-- SMS Conversation Modal -->
-  <div id="smsModal" class="modal" style="display: none;">
-    <div class="modal-content" style="max-width: 700px;">
-      <h2>SMS Conversation Transcript</h2>
-      <div id="smsContent" style="background: #f8f9fa; padding: 1.5rem; border-radius: 8px; margin: 1rem 0; font-family: monospace; white-space: pre-wrap; max-height: 500px; overflow-y: auto; font-size: 13px; line-height: 1.6;">
-        Loading...
-      </div>
-      <div class="modal-actions">
-        <button type="button" onclick="closeSmsModal()" class="btn btn-secondary">Close</button>
-      </div>
-    </div>
-  </div>
+    <script src="/js/dashboard.js"></script>
+    <script src="/js/global.js"></script>
+    <script>
+      // Get organization timezone from header
+      const orgTimezone = window.ORG_TIMEZONE || 'America/New_York';
 
-  <script src="/js/dashboard.js"></script>
-  <script src="/js/global.js"></script>
-  <script>
-    // Toggle sidebar for mobile
-    function toggleSidebar() {
-      const sidebar = document.querySelector('.sidebar');
-      const overlay = document.querySelector('.sidebar-overlay');
-      sidebar.classList.toggle('active');
-      overlay.classList.toggle('active');
-    }
+      // Timezone-aware date formatting functions
+      function formatDateWithTimezone(dateString) {
+        if (!dateString) return '-';
+        const date = new Date(dateString);
+        return date.toLocaleDateString('en-US', {
+          timeZone: orgTimezone,
+          year: 'numeric',
+          month: 'numeric',
+          day: 'numeric'
+        });
+      }
 
-    // Close sidebar when clicking on a link (mobile only)
-    document.querySelectorAll('.sidebar-link').forEach(link => {
-      link.addEventListener('click', () => {
-        if (window.innerWidth < 768) {
-          toggleSidebar();
-        }
-      });
-    });
+      function formatDateTimeWithTimezone(dateString) {
+        if (!dateString) return '-';
+        const date = new Date(dateString);
+        return date.toLocaleString('en-US', {
+          timeZone: orgTimezone,
+          year: 'numeric',
+          month: 'numeric',
+          day: 'numeric',
+          hour: 'numeric',
+          minute: '2-digit',
+          second: '2-digit',
+          hour12: true
+        });
+      }
 
-    // Format absence type badges on page load
-    document.addEventListener('DOMContentLoaded', function() {
-      document.querySelectorAll('.type-badge').forEach(badge => {
-        const rawType = badge.textContent.trim();
-        badge.textContent = formatAbsenceType(rawType);
-      });
-    });
+      function formatTimeWithTimezone(dateString) {
+        if (!dateString) return '-';
+        const date = new Date(dateString);
+        return date.toLocaleTimeString('en-US', {
+          timeZone: orgTimezone,
+          hour: 'numeric',
+          minute: '2-digit',
+          second: '2-digit',
+          hour12: true
+        });
+      }
 
-    // View SMS message
-    async function viewMessage(absenceId) {
-      const modal = document.getElementById('smsModal');
-      const content = document.getElementById('smsContent');
+      function formatFullDateWithTimezone(dateString) {
+        if (!dateString) return '-';
+        const date = new Date(dateString);
+        return date.toLocaleDateString('en-US', {
+          timeZone: orgTimezone,
+          weekday: 'long',
+          year: 'numeric',
+          month: 'long',
+          day: 'numeric'
+        });
+      }
 
-      modal.style.display = 'flex';
-      content.textContent = 'Loading...';
+      // Toggle sidebar for mobile
+      function toggleSidebar() {
+        const sidebar = document.querySelector(".sidebar");
+        const overlay = document.querySelector(".sidebar-overlay");
+        sidebar.classList.toggle("active");
+        overlay.classList.toggle("active");
+      }
 
-      try {
-        const response = await fetch(`/api/absences/${absenceId}`);
-        const data = await response.json();
-
-        if (data.success && data.absence) {
-          const absence = data.absence;
-          let messageHtml = `📱 SMS Conversation Transcript\n\n`;
-          messageHtml += `Employee: ${absence.employee_name}\n`;
-          messageHtml += `Time: ${new Date(absence.report_time).toLocaleString()}\n`;
-          messageHtml += `Method: ${absence.report_method || 'SMS'}\n`;
-          messageHtml += `\n${'─'.repeat(60)}\n\n`;
-
-          // Display full conversation if available
-          if (absence.conversation_transcript && absence.conversation_transcript.length > 0) {
-            absence.conversation_transcript.forEach((msg, index) => {
-              const time = new Date(msg.timestamp).toLocaleTimeString();
-              const prefix = msg.from === 'employee' ? '👤 Employee' : '🤖 System';
-              messageHtml += `[${time}] ${prefix}:\n${msg.message}\n\n`;
-            });
-          } else {
-            // Fallback to original message if no transcript
-            messageHtml += `Original Message:\n${absence.report_message || 'No message recorded'}`;
+      // Close sidebar when clicking on a link (mobile only)
+      document.querySelectorAll(".sidebar-link").forEach((link) => {
+        link.addEventListener("click", () => {
+          if (window.innerWidth < 768) {
+            toggleSidebar();
           }
+        });
+      });
 
-          content.textContent = messageHtml;
-        } else {
-          content.textContent = 'Error loading message';
+      // Format all dates and badges on page load
+      document.addEventListener("DOMContentLoaded", function () {
+        // Format dashboard header date with timezone
+        const dashboardDateEl = document.getElementById('dashboardDate');
+        if (dashboardDateEl) {
+          dashboardDateEl.textContent = formatFullDateWithTimezone(new Date());
         }
-      } catch (error) {
-        content.textContent = 'Error loading message: ' + error.message;
-      }
-    }
 
-    // Close SMS modal
-    function closeSmsModal() {
-      document.getElementById('smsModal').style.display = 'none';
-    }
+        // Format all date-time cells in the table
+        document.querySelectorAll(".date-time-cell").forEach((cell) => {
+          const timestamp = cell.getAttribute('data-timestamp');
+          if (timestamp && timestamp !== 'N/A') {
+            cell.textContent = formatDateTimeWithTimezone(timestamp);
+          } else {
+            cell.textContent = 'N/A';
+          }
+        });
 
-    // Close modal when clicking outside
-    window.onclick = function(event) {
-      if (event.target.classList.contains('modal')) {
-        event.target.style.display = 'none';
+        // Format absence type badges
+        document.querySelectorAll(".type-badge").forEach((badge) => {
+          const rawType = badge.textContent.trim();
+          badge.textContent = formatAbsenceType(rawType);
+        });
+      });
+
+      // View SMS message
+      async function viewMessage(absenceId) {
+        const modal = document.getElementById("smsModal");
+        const content = document.getElementById("smsContent");
+
+        modal.style.display = "flex";
+        content.textContent = "Loading...";
+
+        try {
+          const response = await fetch(`/api/absences/${absenceId}`);
+          const data = await response.json();
+
+          if (data.success && data.absence) {
+            const absence = data.absence;
+            let messageHtml = `📱 SMS Conversation Transcript\n\n`;
+            messageHtml += `Employee: ${absence.employee_name}\n`;
+            messageHtml += `Time: ${formatDateTimeWithTimezone(absence.report_time)}\n`;
+            messageHtml += `Method: ${absence.report_method || "SMS"}\n`;
+            messageHtml += `\n${"─".repeat(60)}\n\n`;
+
+            // Display full conversation if available
+            if (
+              absence.conversation_transcript &&
+              absence.conversation_transcript.length > 0
+            ) {
+              absence.conversation_transcript.forEach((msg, index) => {
+                const time = formatTimeWithTimezone(msg.timestamp);
+                const prefix =
+                  msg.from === "employee" ? "👤 Employee" : "🤖 System";
+                messageHtml += `[${time}] ${prefix}:\n${msg.message}\n\n`;
+              });
+            } else {
+              // Fallback to original message if no transcript
+              messageHtml += `Original Message:\n${
+                absence.report_message || "No message recorded"
+              }`;
+            }
+
+            content.textContent = messageHtml;
+          } else {
+            content.textContent = "Error loading message";
+          }
+        } catch (error) {
+          content.textContent = "Error loading message: " + error.message;
+        }
       }
-    }
-  </script>
-</body>
+
+      // Close SMS modal
+      function closeSmsModal() {
+        document.getElementById("smsModal").style.display = "none";
+      }
+
+      // Close modal when clicking outside
+      window.onclick = function (event) {
+        if (event.target.classList.contains("modal")) {
+          event.target.style.display = "none";
+        }
+      };
+    </script>
+  </body>
 </html>

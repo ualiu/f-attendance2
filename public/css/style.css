@@ -1235,3 +1235,46 @@ a:hover {
     right: -10px;
   }
 }
+
+/* ===================================
+   AMP TIMELINE STYLES
+   =================================== */
+
+.timeline-item {
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.timeline-item:hover {
+  transform: translateX(5px);
+}
+
+.timeline-loading {
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 0.6; }
+  50% { opacity: 1; }
+}
+
+/* Mobile responsiveness for timeline */
+@media (max-width: 768px) {
+  .timeline-item {
+    padding-left: 1rem !important;
+  }
+
+  .timeline-item > div > div {
+    font-size: 0.9rem;
+  }
+
+  .timeline-item strong {
+    font-size: 1rem !important;
+  }
+}
+
+/* Print styles - hide AMP timeline when printing */
+@media print {
+  #ampTimeline {
+    display: none;
+  }
+}

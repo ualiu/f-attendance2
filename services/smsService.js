@@ -706,13 +706,13 @@ RESPOND WITH JSON ONLY - NO EXPLANATIONS!`;
 };
 
 // Log absence from SMS
-exports.logAbsenceFromSMS = async ({ employee, parsedData, originalMessage, phoneNumber, transcript = [] }) => {
+exports.logAbsenceFromSMS = async ({ employee, parsedData, originalMessage, phoneNumber, transcript = [], organization }) => {
   try {
     console.log('   💾 logAbsenceFromSMS called with transcript length:', transcript.length);
     console.log('   💾 Transcript content:', JSON.stringify(transcript, null, 2));
 
     const callTime = new Date();
-    const noticeCheck = attendanceService.checkNoticeTime(employee, callTime);
+    const noticeCheck = attendanceService.checkNoticeTime(employee, callTime, organization);
 
     let absenceType = 'sick'; // Database type field
     const duration = parsedData.duration_minutes || 0;
@@ -732,23 +732,26 @@ exports.logAbsenceFromSMS = async ({ employee, parsedData, originalMessage, phon
       absenceType = parsedData.subtype || 'sick'; // Use subtype (sick/personal)
     }
 
-    // Calculate actual absence date based on extracted date
-    let absenceDate = new Date();
-    absenceDate.setHours(0, 0, 0, 0); // Reset to start of day
+    // Calculate actual absence date based on extracted date (use UTC to avoid timezone issues)
+    const now = new Date();
+    const year = now.getUTCFullYear();
+    const month = now.getUTCMonth();
+    const day = now.getUTCDate();
+    let absenceDate = new Date(Date.UTC(year, month, day, 0, 0, 0, 0));
 
     const dateRef = parsedData.date || 'today';
 
     if (dateRef === 'tomorrow') {
       // Add 1 day
-      absenceDate.setDate(absenceDate.getDate() + 1);
+      absenceDate.setUTCDate(absenceDate.getUTCDate() + 1);
     } else if (['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'].includes(dateRef)) {
       // Calculate next occurrence of this day
       const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
       const targetDay = dayNames.indexOf(dateRef);
-      const currentDay = absenceDate.getDay();
+      const currentDay = absenceDate.getUTCDay();
       let daysToAdd = targetDay - currentDay;
       if (daysToAdd <= 0) daysToAdd += 7; // If day has passed this week, go to next week
-      absenceDate.setDate(absenceDate.getDate() + daysToAdd);
+      absenceDate.setUTCDate(absenceDate.getUTCDate() + daysToAdd);
     }
     // Otherwise use today (default)
 
@@ -773,6 +776,9 @@ exports.logAbsenceFromSMS = async ({ employee, parsedData, originalMessage, phon
       report_message: originalMessage,
       conversation_transcript: transcript, // Full conversation history
       late_notice: noticeCheck.isLateNotice,
+      late_duration_minutes: absenceType === 'late' ? duration : null, // Only for lates
+      minutes_before_shift: noticeCheck.minutesBeforeShift, // Track advance notice
+      policy_violation: noticeCheck.isLateNotice, // Flag if less than 30 minutes notice
       organization_id: employee.organization_id // CRITICAL: Assign to employee's organization
     });
 
@@ -782,6 +788,8 @@ exports.logAbsenceFromSMS = async ({ employee, parsedData, originalMessage, phon
     console.log(`   Type: ${absenceType} (${parsedData.type})`);
     console.log(`   Duration: ${duration} minutes`);
     console.log(`   Date: ${absenceDate.toLocaleDateString()} (${dateRef})`);
+    console.log(`   ⏰ Advance notice: ${noticeCheck.minutesBeforeShift} minutes before shift`);
+    console.log(`   ${noticeCheck.isLateNotice ? '⚠️  POLICY VIOLATION: Less than 30 minutes notice' : '✅ Policy compliant: 30+ minutes notice'}`);
     console.log(`   💾 Saved transcript length: ${absence.conversation_transcript?.length || 0}`);
     console.log(`   💾 Saved transcript:`, JSON.stringify(absence.conversation_transcript, null, 2));
 

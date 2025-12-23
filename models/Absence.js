@@ -87,6 +87,22 @@ const absenceSchema = new mongoose.Schema({
     default: false
   },
 
+  // Policy compliance tracking
+  minutes_before_shift: {
+    type: Number,
+    default: null
+  },
+  policy_violation: {
+    type: Boolean,
+    default: false // True if reported less than 30 minutes before shift
+  },
+
+  // Late duration tracking (in minutes)
+  late_duration_minutes: {
+    type: Number,
+    default: null
+  },
+
   created_at: {
     type: Date,
     default: Date.now

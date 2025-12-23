@@ -1,10 +1,14 @@
 const express = require('express');
 const router = express.Router();
-const { requireTenantAuth } = require('../middleware/auth');
+const { requireTenantAuth, ensureSuperAdmin } = require('../middleware/auth');
 const { scopeQuery, validateTenantAccess } = require('../utils/tenantHelper');
 const Employee = require('../models/Employee');
 const Absence = require('../models/Absence');
+const EmployeeNote = require('../models/EmployeeNote');
 const attendanceService = require('../services/attendanceService');
+const path = require('path');
+const fs = require('fs');
+const { ampDocumentUpload, FILE_TYPE_MAP } = require('../config/multer');
 
 // All employee routes require authentication + tenant scoping
 router.use(requireTenantAuth);
@@ -188,6 +192,254 @@ router.post('/bulk-import', async (req, res) => {
 
     res.json({ success: true, count: created.length, employees: created });
   } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// ============================================
+// EMPLOYEE NOTES (AMP ENFORCEMENT TIMELINE)
+// ============================================
+
+// Get all notes for an employee (tenant-scoped)
+router.get('/:id/notes', async (req, res) => {
+  try {
+    // Validate employee belongs to organization
+    await validateTenantAccess(Employee, req.params.id, req.organizationId);
+
+    const notes = await EmployeeNote.find(
+      scopeQuery(req.organizationId, { employee_id: req.params.id })
+    )
+      .sort({ created_at: -1 }) // Newest first
+      .limit(100);
+
+    res.json({ success: true, notes });
+  } catch (error) {
+    if (error.message === 'Resource not found or access denied') {
+      return res.status(404).json({ success: false, error: 'Employee not found' });
+    }
+    console.error('Error fetching notes:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Create a new note with optional file uploads
+router.post('/:id/notes', ampDocumentUpload.array('attachments', 5), async (req, res) => {
+  try {
+    const { content } = req.body;
+
+    // Validate required fields
+    if (!content) {
+      // Clean up uploaded files if validation fails
+      if (req.files) {
+        req.files.forEach(file => fs.unlinkSync(file.path));
+      }
+      return res.status(400).json({
+        success: false,
+        error: 'Missing required field: content'
+      });
+    }
+
+    // Validate employee belongs to organization
+    const employee = await validateTenantAccess(Employee, req.params.id, req.organizationId);
+
+    // Additional file validation - verify extension matches mimetype
+    if (req.files && req.files.length > 0) {
+      for (const file of req.files) {
+        const expectedExt = FILE_TYPE_MAP[file.mimetype];
+        const actualExt = path.extname(file.originalname).toLowerCase();
+
+        if (expectedExt !== actualExt) {
+          // Clean up all files
+          req.files.forEach(f => fs.unlinkSync(f.path));
+          return res.status(400).json({
+            success: false,
+            error: `File ${file.originalname} has mismatched extension`
+          });
+        }
+      }
+    }
+
+    // Build attachments array from uploaded files
+    const attachments = (req.files || []).map(file => ({
+      filename: file.filename,
+      original_name: file.originalname,
+      mimetype: file.mimetype,
+      size: file.size,
+      path: `amp-documents/org_${req.organizationId}/${file.filename}`
+    }));
+
+    // Create note
+    const note = await EmployeeNote.create({
+      employee_id: employee._id,
+      organization_id: req.organizationId,
+      author_id: req.user._id,
+      author_name: req.user.name || req.user.email,
+      content,
+      attachments,
+      is_edited: false
+    });
+
+    console.log(`✅ NOTE CREATED:`);
+    console.log(`   Employee: ${employee.name}`);
+    console.log(`   Author: ${req.user.name || req.user.email}`);
+    console.log(`   Attachments: ${attachments.length}`);
+
+    res.json({
+      success: true,
+      note,
+      message: 'Note created successfully'
+    });
+  } catch (error) {
+    // Clean up uploaded files on error
+    if (req.files) {
+      req.files.forEach(file => {
+        try {
+          fs.unlinkSync(file.path);
+        } catch (err) {
+          console.error('Error deleting file:', err);
+        }
+      });
+    }
+
+    if (error.message === 'Resource not found or access denied') {
+      return res.status(404).json({ success: false, error: 'Employee not found' });
+    }
+    console.error('Error creating note:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Update a note (super admin only, no file changes)
+router.put('/:id/notes/:noteId', ensureSuperAdmin, async (req, res) => {
+  try {
+    const { content } = req.body;
+
+    // Validate employee belongs to organization
+    await validateTenantAccess(Employee, req.params.id, req.organizationId);
+
+    // Validate note belongs to organization and employee
+    const note = await EmployeeNote.findOne(
+      scopeQuery(req.organizationId, {
+        _id: req.params.noteId,
+        employee_id: req.params.id
+      })
+    );
+
+    if (!note) {
+      return res.status(404).json({ success: false, error: 'Note not found' });
+    }
+
+    // Update fields
+    if (content) note.content = content;
+    note.is_edited = true;
+    note.edited_at = new Date();
+
+    await note.save();
+
+    console.log(`✅ NOTE UPDATED by ${req.user.name || req.user.email}`);
+
+    res.json({
+      success: true,
+      note,
+      message: 'Note updated successfully'
+    });
+  } catch (error) {
+    console.error('Error updating note:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Delete a note and its attachments (super admin only)
+router.delete('/:id/notes/:noteId', ensureSuperAdmin, async (req, res) => {
+  try {
+    // Validate employee belongs to organization
+    await validateTenantAccess(Employee, req.params.id, req.organizationId);
+
+    // Find and validate note
+    const note = await EmployeeNote.findOne(
+      scopeQuery(req.organizationId, {
+        _id: req.params.noteId,
+        employee_id: req.params.id
+      })
+    );
+
+    if (!note) {
+      return res.status(404).json({ success: false, error: 'Note not found' });
+    }
+
+    // Delete associated files
+    if (note.attachments && note.attachments.length > 0) {
+      note.attachments.forEach(attachment => {
+        try {
+          const filePath = path.join(__dirname, '..', 'uploads', attachment.path);
+          if (fs.existsSync(filePath)) {
+            fs.unlinkSync(filePath);
+            console.log(`   Deleted file: ${attachment.original_name}`);
+          }
+        } catch (err) {
+          console.error(`Error deleting file ${attachment.original_name}:`, err);
+        }
+      });
+    }
+
+    // Delete note
+    await note.deleteOne();
+
+    console.log(`✅ NOTE DELETED by ${req.user.name || req.user.email}`);
+
+    res.json({
+      success: true,
+      message: 'Note and attachments deleted successfully'
+    });
+  } catch (error) {
+    console.error('Error deleting note:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Download an attachment (tenant-scoped)
+router.get('/:id/notes/:noteId/download/:filename', async (req, res) => {
+  try {
+    // Validate employee belongs to organization
+    await validateTenantAccess(Employee, req.params.id, req.organizationId);
+
+    // Validate note belongs to organization
+    const note = await EmployeeNote.findOne(
+      scopeQuery(req.organizationId, {
+        _id: req.params.noteId,
+        employee_id: req.params.id
+      })
+    );
+
+    if (!note) {
+      return res.status(404).json({ success: false, error: 'Note not found' });
+    }
+
+    // Find attachment in note
+    const attachment = note.attachments.find(a => a.filename === req.params.filename);
+    if (!attachment) {
+      return res.status(404).json({ success: false, error: 'Attachment not found' });
+    }
+
+    // Build file path
+    const filePath = path.join(__dirname, '..', 'uploads', attachment.path);
+
+    // Check file exists
+    if (!fs.existsSync(filePath)) {
+      return res.status(404).json({ success: false, error: 'File not found on server' });
+    }
+
+    // Set headers for download
+    res.setHeader('Content-Type', attachment.mimetype);
+    res.setHeader('Content-Disposition', `attachment; filename="${attachment.original_name}"`);
+
+    // Stream file
+    const fileStream = fs.createReadStream(filePath);
+    fileStream.pipe(res);
+
+    console.log(`📥 File downloaded: ${attachment.original_name} by ${req.user.name || req.user.email}`);
+  } catch (error) {
+    console.error('Error downloading file:', error);
     res.status(500).json({ success: false, error: error.message });
   }
 });

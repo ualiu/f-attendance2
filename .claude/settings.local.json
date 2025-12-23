@@ -16,7 +16,9 @@
       "Bash(node scripts/drop-username-index.js:*)",
       "Bash(node scripts/add-phone-unique-index.js:*)",
       "WebFetch(domain:platform.openai.com)",
-      "WebSearch"
+      "WebSearch",
+      "Bash(npm start)",
+      "Bash(node scripts/check-recent-absence.js:*)"
     ],
     "deny": [],
     "ask": []

@@ -4,8 +4,7 @@ const twilio = require('twilio');
 const Employee = require('../models/Employee');
 const Absence = require('../models/Absence');
 const Organization = require('../models/Organization');
-const smsServiceClaude = require('../services/smsService');
-const smsServiceOpenAI = require('../services/smsServiceOpenAI');
+const smsService = require('../services/smsService');
 
 // Twilio webhook for incoming SMS
 router.post('/incoming', async (req, res) => {
@@ -48,10 +47,7 @@ router.post('/incoming', async (req, res) => {
     const organization = await Organization.findById(employee.organization_id);
     const organizationName = organization ? organization.name : 'your company';
 
-    // Determine which LLM service to use based on organization settings
-    const llmProvider = organization?.settings?.llm_provider || 'claude';
-    const smsService = llmProvider === 'openai' ? smsServiceOpenAI : smsServiceClaude;
-    console.log(`   🤖 Using LLM provider: ${llmProvider.toUpperCase()}`);
+    console.log('   🤖 Using Claude AI for SMS parsing');
 
     // Get organization timezone and current time
     const orgTimezone = organization?.settings?.timezone || 'America/New_York';
@@ -196,7 +192,8 @@ router.post('/incoming', async (req, res) => {
       parsedData,
       originalMessage: messageBody,
       phoneNumber,
-      transcript: conversationState.transcript
+      transcript: conversationState.transcript,
+      organization
     });
 
     console.log('   ✅ Absence logged:', absence._id);

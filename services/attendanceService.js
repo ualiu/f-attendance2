@@ -10,8 +10,8 @@ const scopeQuery = (organizationId, baseQuery = {}) => {
 };
 
 // Check if notice was given in time (30 minutes before shift)
-exports.checkNoticeTime = (employee, callTime) => {
-  const shiftStart = this.getShiftStartTime(employee.shift);
+exports.checkNoticeTime = (employee, callTime, organization) => {
+  const shiftStart = this.getShiftStartTime(employee.shift, organization);
   const minutesBeforeShift = (shiftStart - callTime) / 60000;
 
   return {
@@ -20,33 +20,52 @@ exports.checkNoticeTime = (employee, callTime) => {
   };
 };
 
-// Get shift start time for today
-exports.getShiftStartTime = (shift) => {
+// Get shift start time for today using organization's configured shift times
+exports.getShiftStartTime = (shift, organization) => {
   const today = new Date();
   today.setSeconds(0);
   today.setMilliseconds(0);
 
-  if (shift === 'Day (7am-3:30pm)') {
-    today.setHours(7, 0, 0);
-  } else if (shift === 'Afternoon (3:30pm-12am)') {
-    today.setHours(15, 30, 0);
-  } else if (shift === 'Night (12am-7am)') {
-    today.setHours(0, 0, 0);
+  // Get configured shift times from organization, or use defaults
+  const shiftTimes = organization?.settings?.shift_times || {
+    day_start: '07:00',
+    night_start: '19:00',
+    weekend_start: '08:00'
+  };
+
+  let startTime;
+  if (shift === 'Day') {
+    startTime = shiftTimes.day_start;
+  } else if (shift === 'Night') {
+    startTime = shiftTimes.night_start;
+  } else if (shift === 'Weekend') {
+    startTime = shiftTimes.weekend_start;
+  } else {
+    // Fallback for any legacy shift names
+    startTime = '07:00';
   }
+
+  // Parse HH:MM format
+  const [hours, minutes] = startTime.split(':').map(Number);
+  today.setHours(hours, minutes, 0);
 
   return today;
 };
 
 // Get today's attendance summary
 exports.getTodaysSummary = async (organizationId) => {
+  // Use UTC midnight to avoid timezone issues
   const today = new Date();
-  today.setHours(0, 0, 0, 0);
+  const year = today.getUTCFullYear();
+  const month = today.getUTCMonth();
+  const day = today.getUTCDate();
+  const todayUTC = new Date(Date.UTC(year, month, day, 0, 0, 0, 0));
 
-  const tomorrow = new Date(today);
-  tomorrow.setDate(tomorrow.getDate() + 1);
+  const tomorrow = new Date(todayUTC);
+  tomorrow.setUTCDate(tomorrow.getUTCDate() + 1);
 
   const todaysAbsences = await Absence.find(scopeQuery(organizationId, {
-    date: { $gte: today, $lt: tomorrow }
+    date: { $gte: todayUTC, $lt: tomorrow }
   })).populate('employee_id');
 
   const totalEmployees = await Employee.countDocuments(scopeQuery(organizationId));

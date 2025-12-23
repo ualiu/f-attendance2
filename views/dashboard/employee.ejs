@@ -18,7 +18,9 @@
           <%= employee.employee_id %> | <%= employee.shift %>
         </p>
       </div>
-      <div style="display: flex; gap: 0.5rem;">
+      <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+        <button onclick="showManualAbsenceModal()" class="btn btn-primary">Log Absence</button>
+        <button onclick="showAbsenceHistoryModal()" class="btn btn-primary">View History</button>
         <button onclick="showEditModal()" class="btn btn-primary">Edit Employee</button>
         <button onclick="deleteEmployee()" class="btn btn-danger">Delete Employee</button>
       </div>
@@ -49,102 +51,20 @@
       </div>
     </div>
 
-    <!-- Manual Absence Logging -->
-    <div class="section">
-      <h2>Log Manual Absence</h2>
-      <div style="background: white; padding: 1.5rem; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
-        <form id="manualAbsenceForm" style="display: grid; gap: 1rem;">
-          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 1rem;">
-            <div class="form-group">
-              <label for="absenceType"><strong>Incident Type *</strong></label>
-              <select id="absenceType" name="type" required style="width: 100%; padding: 0.5rem; border: 1px solid #ddd; border-radius: 4px;">
-                <option value="">Select incident type...</option>
-                <option value="no_sms_no_show">No SMS, No Show</option>
-                <option value="late_sms_no_show">Late SMS, No Show</option>
-                <option value="left_early_no_permission">Left Early, No Permission</option>
-                <option value="left_early_permission">Left Early with Permission</option>
-                <option value="late_in_no_sms">Late In, No SMS</option>
-              </select>
-            </div>
-
-            <div class="form-group">
-              <label for="absenceDate"><strong>Date *</strong></label>
-              <input type="date" id="absenceDate" name="date" required style="width: 100%; padding: 0.5rem; border: 1px solid #ddd; border-radius: 4px;" value="<%= new Date().toISOString().split('T')[0] %>">
-            </div>
-          </div>
-
-          <div class="form-group">
-            <label for="absenceReason"><strong>Reason/Notes *</strong></label>
-            <textarea id="absenceReason" name="reason" required rows="3" placeholder="Enter reason or additional notes..." style="width: 100%; padding: 0.5rem; border: 1px solid #ddd; border-radius: 4px; font-family: inherit;"></textarea>
-          </div>
-
-          <div>
-            <button type="submit" class="btn btn-primary">Log Absence</button>
-            <button type="reset" class="btn btn-secondary">Clear Form</button>
-          </div>
-
-          <div id="formMessage" style="display: none; padding: 1rem; border-radius: 4px; margin-top: 0.5rem;"></div>
-        </form>
-      </div>
-    </div>
-
+    <!-- Notes Timeline -->
     <div class="section">
       <div class="section-header">
-        <h2>Absence History</h2>
+        <h2>Management Notes</h2>
+        <button onclick="showAddNoteModal()" class="btn btn-primary">Add Note</button>
       </div>
-
-      <!-- Date Range Filter -->
-      <div style="background: white; padding: 1rem; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); margin-bottom: 1rem;">
-        <form method="GET" action="/dashboard/employee/<%= employee._id %>" style="display: flex; gap: 1rem; align-items: end; flex-wrap: wrap;">
-          <div class="form-group" style="margin: 0;">
-            <label style="display: block; margin-bottom: 0.25rem; font-weight: 500;">Start Date</label>
-            <input type="date" name="start" value="<%= startDate.toISOString().split('T')[0] %>" style="padding: 0.5rem; border: 1px solid #ddd; border-radius: 4px;">
-          </div>
-          <div class="form-group" style="margin: 0;">
-            <label style="display: block; margin-bottom: 0.25rem; font-weight: 500;">End Date</label>
-            <input type="date" name="end" value="<%= endDate.toISOString().split('T')[0] %>" style="padding: 0.5rem; border: 1px solid #ddd; border-radius: 4px;">
-          </div>
-          <button type="submit" class="btn btn-primary" style="margin: 0;">Apply</button>
-          <a href="/dashboard/employee/<%= employee._id %>" class="btn btn-secondary" style="margin: 0;">Reset to Quarter</a>
-        </form>
-      </div>
-
-      <div class="table-responsive">
-        <table class="data-table">
-        <thead>
-          <tr>
-            <th>Date</th>
-            <th>Type</th>
-            <th>Reason</th>
-            <th>Actions</th>
-          </tr>
-        </thead>
-        <tbody>
-          <% if (absences.length === 0) { %>
-            <tr>
-              <td colspan="4" class="no-data">No absences this quarter</td>
-            </tr>
-          <% } else { %>
-            <% absences.forEach(absence => { %>
-              <tr>
-                <td><%= new Date(absence.date).toLocaleDateString() %></td>
-                <td><span class="type-badge type-<%= absence.type %>"><%= absence.type %></span></td>
-                <td><%= absence.reason %></td>
-                <td>
-                  <% if (absence.report_message) { %>
-                    <button onclick="viewMessage('<%= absence._id %>')" class="btn-small">View</button>
-                  <% } %>
-                </td>
-              </tr>
-            <% }); %>
-          <% } %>
-        </tbody>
-      </table>
+      <div id="ampTimeline" style="background: white; padding: 1.5rem; border-radius: 8px;">
+        <div class="timeline-loading" style="text-align: center; padding: 2rem; color: #6c757d;">
+          Loading notes...
+        </div>
       </div>
     </div>
 
     <div class="quick-actions">
-      <a href="/reports/employee?employeeId=<%= employee._id %>" class="btn btn-primary">Generate AI Report</a>
       <a href="/dashboard" class="btn btn-secondary">Back to Dashboard</a>
     </div>
   </main>
@@ -186,116 +106,557 @@
     </div>
   </div>
 
+  <!-- Manual Absence Modal -->
+  <div id="manualAbsenceModal" class="modal" style="display: none;">
+    <div class="modal-content">
+      <h2>Log Manual Absence</h2>
+      <form id="manualAbsenceForm">
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 1rem;">
+          <div class="form-group">
+            <label for="absenceType"><strong>Incident Type *</strong></label>
+            <select id="absenceType" name="type" required style="width: 100%; padding: 0.5rem; border: 1px solid #ddd; border-radius: 4px;">
+              <option value="">Select incident type...</option>
+              <option value="no_sms_no_show">No SMS, No Show</option>
+              <option value="late_sms_no_show">Late SMS, No Show</option>
+              <option value="left_early_no_permission">Left Early, No Permission</option>
+              <option value="left_early_permission">Left Early with Permission</option>
+              <option value="late_in_no_sms">Late In, No SMS</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label for="absenceDate"><strong>Date *</strong></label>
+            <input type="date" id="absenceDate" name="date" required style="width: 100%; padding: 0.5rem; border: 1px solid #ddd; border-radius: 4px;" value="<%= new Date().toISOString().split('T')[0] %>">
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label for="absenceReason"><strong>Reason/Notes *</strong></label>
+          <textarea id="absenceReason" name="reason" required rows="3" placeholder="Enter reason or additional notes..." style="width: 100%; padding: 0.5rem; border: 1px solid #ddd; border-radius: 4px; font-family: inherit;"></textarea>
+        </div>
+
+        <div id="absenceFormMessage" style="display: none; padding: 1rem; border-radius: 4px; margin-top: 0.5rem;"></div>
+
+        <div class="modal-actions">
+          <button type="submit" class="btn btn-primary">Log Absence</button>
+          <button type="button" onclick="closeManualAbsenceModal()" class="btn btn-secondary">Cancel</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Absence History Modal -->
+  <div id="absenceHistoryModal" class="modal" style="display: none;">
+    <div class="modal-content" style="max-width: 900px;">
+      <h2>Absence History - <%= employee.name %></h2>
+
+      <!-- Date Range Filter -->
+      <div style="background: #f8f9fa; padding: 1rem; border-radius: 8px; margin-bottom: 1rem;">
+        <form id="absenceFilterForm" style="display: flex; gap: 1rem; align-items: end; flex-wrap: wrap;">
+          <div class="form-group" style="margin: 0;">
+            <label style="display: block; margin-bottom: 0.25rem; font-weight: 500;">Start Date</label>
+            <input type="date" id="filterStartDate" name="start" style="padding: 0.5rem; border: 1px solid #ddd; border-radius: 4px;">
+          </div>
+          <div class="form-group" style="margin: 0;">
+            <label style="display: block; margin-bottom: 0.25rem; font-weight: 500;">End Date</label>
+            <input type="date" id="filterEndDate" name="end" style="padding: 0.5rem; border: 1px solid #ddd; border-radius: 4px;">
+          </div>
+          <button type="submit" class="btn btn-primary" style="margin: 0;">Apply Filter</button>
+          <button type="button" onclick="resetAbsenceFilter()" class="btn btn-secondary" style="margin: 0;">Reset</button>
+        </form>
+      </div>
+
+      <!-- Absence Table -->
+      <div class="table-responsive">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Date</th>
+              <th>Type</th>
+              <th>Reason</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="absenceTableBody">
+            <tr>
+              <td colspan="4" class="no-data">Loading absences...</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="modal-actions">
+        <button onclick="closeAbsenceHistoryModal()" class="btn btn-secondary">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Add AMP Note Modal -->
+  <div id="addNoteModal" class="modal" style="display: none;">
+    <div class="modal-content">
+      <h2>Add Note</h2>
+      <form id="addNoteForm" enctype="multipart/form-data">
+        <div class="form-group">
+          <label for="noteContent"><strong>Note Content *</strong></label>
+          <textarea id="noteContent" name="content" required rows="5" placeholder="Enter details about this attendance management action..." maxlength="5000" style="width: 100%; padding: 0.5rem; border: 1px solid #ddd; border-radius: 4px; font-family: inherit;"></textarea>
+          <small style="color: #6c757d;">Maximum 5000 characters</small>
+        </div>
+
+        <div class="form-group">
+          <label for="noteAttachments"><strong>Attachments (Optional)</strong></label>
+          <input type="file" id="noteAttachments" name="attachments" multiple accept=".pdf,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png" style="width: 100%; padding: 0.5rem; border: 1px solid #ddd; border-radius: 4px;">
+          <small style="display: block; margin-top: 0.5rem; color: #6c757d;">
+            Allowed: PDF, Word, Excel, JPG, PNG | Max 5MB per file | Max 5 files
+          </small>
+          <div id="filePreview" style="margin-top: 1rem;"></div>
+        </div>
+
+        <div id="noteFormMessage" style="display: none; padding: 1rem; border-radius: 4px; margin-top: 0.5rem;"></div>
+
+        <div class="modal-actions">
+          <button type="submit" class="btn btn-primary">Add Note</button>
+          <button type="button" onclick="closeAddNoteModal()" class="btn btn-secondary">Cancel</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Edit Note Modal (Super Admin Only) -->
+  <div id="editNoteModal" class="modal" style="display: none;">
+    <div class="modal-content">
+      <h2>Edit Note</h2>
+      <form id="editNoteForm">
+        <input type="hidden" id="editNoteId">
+
+        <div class="form-group">
+          <label for="editNoteContent"><strong>Note Content *</strong></label>
+          <textarea id="editNoteContent" name="content" required rows="5" maxlength="5000" style="width: 100%; padding: 0.5rem; border: 1px solid #ddd; border-radius: 4px; font-family: inherit;"></textarea>
+        </div>
+
+        <div id="editNoteFormMessage" style="display: none; padding: 1rem; border-radius: 4px; margin-top: 0.5rem;"></div>
+
+        <div class="modal-actions">
+          <button type="submit" class="btn btn-primary">Update Note</button>
+          <button type="button" onclick="closeEditNoteModal()" class="btn btn-secondary">Cancel</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- SMS Conversation Modal -->
+  <div id="smsModal" class="modal" style="display: none;">
+    <div class="modal-content" style="max-width: 700px;">
+      <h2>SMS Conversation Transcript</h2>
+      <div id="smsContent" style="background: #f8f9fa; padding: 1.5rem; border-radius: 8px; margin: 1rem 0; font-family: monospace; white-space: pre-wrap; max-height: 500px; overflow-y: auto; font-size: 13px; line-height: 1.6;">
+        Loading...
+      </div>
+      <div class="modal-actions">
+        <button type="button" onclick="closeSmsModal()" class="btn btn-secondary">Close</button>
+      </div>
+    </div>
+  </div>
+
   <script src="/js/dashboard.js"></script>
   <script src="/js/global.js"></script>
   <script>
-    // Toggle sidebar for mobile
-    function toggleSidebar() {
-      const sidebar = document.querySelector('.sidebar');
-      const overlay = document.querySelector('.sidebar-overlay');
-      sidebar.classList.toggle('active');
-      overlay.classList.toggle('active');
+    // ============================================
+    // GLOBAL STATE
+    // ============================================
+    const employeeId = '<%= employee._id %>';
+    const isSuperAdmin = <%= user.role === 'super_admin' ? 'true' : 'false' %>;
+    const orgTimezone = window.ORG_TIMEZONE || 'America/New_York';
+
+    // ============================================
+    // MODAL FUNCTIONS
+    // ============================================
+    function showManualAbsenceModal() {
+      document.getElementById('manualAbsenceModal').style.display = 'flex';
     }
 
-    // Close sidebar when clicking on a link (mobile only)
-    document.querySelectorAll('.sidebar-link').forEach(link => {
-      link.addEventListener('click', () => {
-        if (window.innerWidth < 768) {
-          toggleSidebar();
-        }
-      });
-    });
+    function closeManualAbsenceModal() {
+      document.getElementById('manualAbsenceModal').style.display = 'none';
+      document.getElementById('manualAbsenceForm').reset();
+      document.getElementById('absenceFormMessage').style.display = 'none';
+    }
 
-    // Manual absence form submission
+    function showAbsenceHistoryModal() {
+      document.getElementById('absenceHistoryModal').style.display = 'flex';
+      loadAbsenceHistory();
+    }
+
+    function closeAbsenceHistoryModal() {
+      document.getElementById('absenceHistoryModal').style.display = 'none';
+    }
+
+    function showAddNoteModal() {
+      document.getElementById('addNoteModal').style.display = 'flex';
+    }
+
+    function closeAddNoteModal() {
+      document.getElementById('addNoteModal').style.display = 'none';
+      document.getElementById('addNoteForm').reset();
+      document.getElementById('filePreview').innerHTML = '';
+      document.getElementById('noteFormMessage').style.display = 'none';
+    }
+
+    function showEditNoteModal(noteId, content) {
+      if (!isSuperAdmin) {
+        alert('Only super admins can edit notes');
+        return;
+      }
+      document.getElementById('editNoteId').value = noteId;
+      document.getElementById('editNoteContent').value = content;
+      document.getElementById('editNoteModal').style.display = 'flex';
+    }
+
+    function closeEditNoteModal() {
+      document.getElementById('editNoteModal').style.display = 'none';
+      document.getElementById('editNoteForm').reset();
+    }
+
+    function showEditModal() {
+      document.getElementById('editEmployeeModal').style.display = 'flex';
+    }
+
+    function closeEditModal() {
+      document.getElementById('editEmployeeModal').style.display = 'none';
+    }
+
+    window.onclick = function(event) {
+      if (event.target.classList.contains('modal')) {
+        event.target.style.display = 'none';
+      }
+    }
+
+    // ============================================
+    // MANUAL ABSENCE FORM
+    // ============================================
     document.getElementById('manualAbsenceForm').addEventListener('submit', async (e) => {
       e.preventDefault();
-
       const formData = {
-        employee_id: '<%= employee._id %>',
+        employee_id: employeeId,
         type: document.getElementById('absenceType').value,
         date: document.getElementById('absenceDate').value,
         reason: document.getElementById('absenceReason').value
       };
 
-      const messageDiv = document.getElementById('formMessage');
+      const messageDiv = document.getElementById('absenceFormMessage');
       const submitBtn = e.target.querySelector('button[type="submit"]');
-
-      // Disable submit button
       submitBtn.disabled = true;
       submitBtn.textContent = 'Logging...';
 
       try {
         const response = await fetch('/api/absences', {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json'
-          },
+          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(formData)
         });
-
         const data = await response.json();
 
         if (data.success) {
-          messageDiv.style.display = 'block';
-          messageDiv.style.background = '#d4edda';
-          messageDiv.style.color = '#155724';
-          messageDiv.style.border = '1px solid #c3e6cb';
-          messageDiv.textContent = '✅ Absence logged successfully!';
-
-          // Reset form
-          e.target.reset();
-          document.getElementById('absenceDate').value = '<%= new Date().toISOString().split('T')[0] %>';
-
-          // Reload page after 1 second to show new absence in table
+          showMessage(messageDiv, 'success', 'Absence logged successfully!');
           setTimeout(() => {
-            window.location.reload();
+            closeManualAbsenceModal();
+            location.reload();
           }, 1000);
         } else {
           throw new Error(data.error || 'Failed to log absence');
         }
       } catch (error) {
-        messageDiv.style.display = 'block';
-        messageDiv.style.background = '#f8d7da';
-        messageDiv.style.color = '#721c24';
-        messageDiv.style.border = '1px solid #f5c6cb';
-        messageDiv.textContent = '❌ Error: ' + error.message;
-
-        // Re-enable submit button
+        showMessage(messageDiv, 'error', error.message);
         submitBtn.disabled = false;
         submitBtn.textContent = 'Log Absence';
       }
     });
 
-    // Format absence type badges on page load
-    document.addEventListener('DOMContentLoaded', function() {
-      document.querySelectorAll('.type-badge').forEach(badge => {
-        const rawType = badge.textContent.trim();
-        badge.textContent = formatAbsenceType(rawType);
-      });
+    // ============================================
+    // ABSENCE HISTORY
+    // ============================================
+    async function loadAbsenceHistory(startDate = null, endDate = null) {
+      const tableBody = document.getElementById('absenceTableBody');
+      tableBody.innerHTML = '<tr><td colspan="4" class="no-data">Loading...</td></tr>';
+
+      try {
+        let url = `/api/employees/${employeeId}/absences`;
+        const params = new URLSearchParams();
+        if (startDate) params.append('startDate', startDate);
+        if (endDate) params.append('endDate', endDate);
+        if (params.toString()) url += '?' + params.toString();
+
+        const response = await fetch(url);
+        const data = await response.json();
+
+        if (data.success) {
+          renderAbsenceTable(data.absences);
+        } else {
+          throw new Error(data.error);
+        }
+      } catch (error) {
+        tableBody.innerHTML = `<tr><td colspan="4" class="no-data" style="color: red;">Error: ${error.message}</td></tr>`;
+      }
+    }
+
+    function renderAbsenceTable(absences) {
+      const tableBody = document.getElementById('absenceTableBody');
+      if (absences.length === 0) {
+        tableBody.innerHTML = '<tr><td colspan="4" class="no-data">No absences found</td></tr>';
+        return;
+      }
+
+      tableBody.innerHTML = absences.map(absence => {
+        const viewButton = absence.report_message
+          ? '<button onclick="viewMessage(\'' + absence._id + '\')" class="btn-small">View SMS</button>'
+          : '-';
+
+        return `
+          <tr>
+            <td>${formatDateWithTimezone(absence.date)}</td>
+            <td><span class="type-badge type-${absence.type}">${formatAbsenceType(absence.type)}</span></td>
+            <td>${absence.reason}</td>
+            <td>${viewButton}</td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    document.getElementById('absenceFilterForm').addEventListener('submit', (e) => {
+      e.preventDefault();
+      loadAbsenceHistory(
+        document.getElementById('filterStartDate').value,
+        document.getElementById('filterEndDate').value
+      );
     });
 
-    // Show edit modal
-    function showEditModal() {
-      document.getElementById('editEmployeeModal').style.display = 'flex';
+    function resetAbsenceFilter() {
+      document.getElementById('filterStartDate').value = '';
+      document.getElementById('filterEndDate').value = '';
+      loadAbsenceHistory();
     }
 
-    // Close edit modal
-    function closeEditModal() {
-      document.getElementById('editEmployeeModal').style.display = 'none';
+    // ============================================
+    // AMP NOTES - TIMELINE
+    // ============================================
+    async function loadAMPNotes() {
+      const timeline = document.getElementById('ampTimeline');
+      timeline.innerHTML = '<div class="timeline-loading" style="text-align: center; padding: 2rem; color: #6c757d;">Loading...</div>';
+
+      try {
+        const response = await fetch(`/api/employees/${employeeId}/notes`);
+        const data = await response.json();
+        if (data.success) {
+          renderAMPTimeline(data.notes);
+        } else {
+          throw new Error(data.error);
+        }
+      } catch (error) {
+        timeline.innerHTML = `<div style="text-align: center; padding: 2rem; color: red;">Error: ${error.message}</div>`;
+      }
     }
 
-    // Update employee
+    function renderAMPTimeline(notes) {
+      const timeline = document.getElementById('ampTimeline');
+
+      if (notes.length === 0) {
+        timeline.innerHTML = `
+          <div style="text-align: center; padding: 3rem; color: #6c757d;">
+            <p style="font-size: 1.1rem; margin-bottom: 0.5rem;">No notes yet</p>
+            <p style="font-size: 0.9rem;">Click "Add Note" to start tracking</p>
+          </div>`;
+        return;
+      }
+
+      timeline.innerHTML = notes.map(note => {
+        // Prepare content for onclick handler (escape quotes and newlines)
+        const escapedContent = note.content
+          .replace(/\\/g, '\\\\')
+          .replace(/'/g, "\\'")
+          .replace(/"/g, '\\"')
+          .replace(/\n/g, '\\n');
+
+        // Build admin buttons if super admin
+        let adminButtons = '';
+        if (isSuperAdmin) {
+          adminButtons = '<div style="display: flex; gap: 0.5rem;">' +
+            '<button onclick="showEditNoteModal(\'' + note._id + '\', \'' + escapedContent + '\')" class="btn-small">Edit</button>' +
+            '<button onclick="deleteNote(\'' + note._id + '\')" class="btn-small" style="background: #dc3545;">Delete</button>' +
+            '</div>';
+        }
+
+        // Build attachments section
+        let attachmentsHtml = '';
+        if (note.attachments && note.attachments.length > 0) {
+          const attachmentLinks = note.attachments.map(att =>
+            '<a href="/api/employees/' + employeeId + '/notes/' + note._id + '/download/' + att.filename + '" ' +
+            'class="btn-small" style="background: #28a745; text-decoration: none;">' +
+            '📎 ' + att.original_name + ' (' + formatFileSize(att.size) + ')' +
+            '</a>'
+          ).join('');
+
+          attachmentsHtml = `
+            <div style="margin-top: 0.75rem;">
+              <strong style="font-size: 0.9rem; color: #495057;">Attachments:</strong>
+              <div style="display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 0.5rem;">
+                ${attachmentLinks}
+              </div>
+            </div>`;
+        }
+
+        return `
+          <div class="timeline-item" style="border-left: 3px solid #0066cc; padding-left: 1.5rem; margin-bottom: 2rem; position: relative;">
+            <div style="position: absolute; left: -0.65rem; top: 0; width: 1.3rem; height: 1.3rem; background: white; border: 3px solid #0066cc; border-radius: 50%;"></div>
+
+            <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 0.5rem; flex-wrap: wrap; gap: 0.5rem;">
+              <div style="color: #6c757d; font-size: 0.85rem;">
+                ${note.author_name} • ${formatDateTimeWithTimezone(note.created_at)}
+                ${note.is_edited ? '<span style="margin-left: 0.5rem;">(edited)</span>' : ''}
+              </div>
+              ${adminButtons}
+            </div>
+
+            <div style="background: #f8f9fa; padding: 1rem; border-radius: 6px; margin-bottom: 0.75rem; white-space: pre-wrap; font-size: 0.95rem;">
+              ${escapeHtml(note.content)}
+            </div>
+
+            ${attachmentsHtml}
+          </div>
+        `;
+      }).join('');
+    }
+
+    // ============================================
+    // ADD NOTE FORM
+    // ============================================
+    document.getElementById('noteAttachments').addEventListener('change', (e) => {
+      const files = Array.from(e.target.files);
+      const preview = document.getElementById('filePreview');
+
+      if (files.length === 0) {
+        preview.innerHTML = '';
+        return;
+      }
+
+      preview.innerHTML = `
+        <div style="background: #f8f9fa; padding: 1rem; border-radius: 6px;">
+          <strong style="display: block; margin-bottom: 0.5rem;">Selected files:</strong>
+          ${files.map((file, i) => `
+            <div style="padding: 0.5rem; background: white; margin-bottom: 0.5rem; border-radius: 4px; display: flex; justify-content: space-between; align-items: center;">
+              <span>📎 ${file.name} (${formatFileSize(file.size)})</span>
+              <button type="button" onclick="removeFile(${i})" style="background: #dc3545; color: white; border: none; padding: 0.25rem 0.5rem; border-radius: 4px; cursor: pointer;">Remove</button>
+            </div>
+          `).join('')}
+        </div>
+      `;
+    });
+
+    function removeFile(index) {
+      const input = document.getElementById('noteAttachments');
+      const dt = new DataTransfer();
+      Array.from(input.files).forEach((file, i) => {
+        if (i !== index) dt.items.add(file);
+      });
+      input.files = dt.files;
+      input.dispatchEvent(new Event('change'));
+    }
+
+    document.getElementById('addNoteForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const formData = new FormData(e.target);
+      const messageDiv = document.getElementById('noteFormMessage');
+      const submitBtn = e.target.querySelector('button[type="submit"]');
+      submitBtn.disabled = true;
+      submitBtn.textContent = 'Adding...';
+
+      try {
+        const response = await fetch(`/api/employees/${employeeId}/notes`, {
+          method: 'POST',
+          body: formData
+        });
+        const data = await response.json();
+
+        if (data.success) {
+          showMessage(messageDiv, 'success', 'Note added successfully!');
+          setTimeout(() => {
+            closeAddNoteModal();
+            loadAMPNotes();
+          }, 1000);
+        } else {
+          throw new Error(data.error || 'Failed to add note');
+        }
+      } catch (error) {
+        showMessage(messageDiv, 'error', error.message);
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Add Note';
+      }
+    });
+
+    // ============================================
+    // EDIT NOTE FORM
+    // ============================================
+    document.getElementById('editNoteForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const noteId = document.getElementById('editNoteId').value;
+      const formData = {
+        content: document.getElementById('editNoteContent').value
+      };
+      const messageDiv = document.getElementById('editNoteFormMessage');
+      const submitBtn = e.target.querySelector('button[type="submit"]');
+      submitBtn.disabled = true;
+      submitBtn.textContent = 'Updating...';
+
+      try {
+        const response = await fetch(`/api/employees/${employeeId}/notes/${noteId}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(formData)
+        });
+        const data = await response.json();
+
+        if (data.success) {
+          showMessage(messageDiv, 'success', 'Note updated!');
+          setTimeout(() => {
+            closeEditNoteModal();
+            loadAMPNotes();
+          }, 1000);
+        } else {
+          throw new Error(data.error);
+        }
+      } catch (error) {
+        showMessage(messageDiv, 'error', error.message);
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Update Note';
+      }
+    });
+
+    // ============================================
+    // DELETE NOTE
+    // ============================================
+    async function deleteNote(noteId) {
+      if (!confirm('Delete this note and all attachments?')) return;
+      try {
+        const response = await fetch(`/api/employees/${employeeId}/notes/${noteId}`, { method: 'DELETE' });
+        const data = await response.json();
+        if (data.success) {
+          loadAMPNotes();
+        } else {
+          throw new Error(data.error);
+        }
+      } catch (error) {
+        alert('Error: ' + error.message);
+      }
+    }
+
+    // ============================================
+    // EXISTING FUNCTIONS
+    // ============================================
     async function updateEmployee(e) {
       e.preventDefault();
       const formData = new FormData(e.target);
       const data = Object.fromEntries(formData);
-
       const response = await fetch('/api/employees/<%= employee._id %>', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(data)
       });
-
       if (response.ok) {
         closeEditModal();
         location.reload();
@@ -304,24 +665,150 @@
       }
     }
 
-    // Delete employee
     async function deleteEmployee() {
-      if (!confirm('Are you sure you want to delete <%= employee.name %>? This will also delete all absence records.')) return;
-
+      if (!confirm('Delete <%= employee.name %>? This will delete all absences and notes.')) return;
       const response = await fetch('/api/employees/<%= employee._id %>', { method: 'DELETE' });
       if (response.ok) {
-        window.location.href = '/admin/manage';
+        window.location.href = '/admin/employees';
       } else {
         alert('Error deleting employee');
       }
     }
 
-    // Close modal when clicking outside
-    window.onclick = function(event) {
-      if (event.target.classList.contains('modal')) {
-        event.target.style.display = 'none';
+    async function viewMessage(absenceId) {
+      const modal = document.getElementById('smsModal');
+      const content = document.getElementById('smsContent');
+
+      modal.style.display = 'flex';
+      content.textContent = 'Loading...';
+
+      try {
+        const response = await fetch('/api/absences/' + absenceId);
+        const data = await response.json();
+
+        if (data.success && data.absence) {
+          const absence = data.absence;
+          let messageHtml = '📱 SMS Conversation Transcript\n\n';
+          messageHtml += 'Employee: ' + absence.employee_name + '\n';
+          messageHtml += 'Time: ' + formatDateTimeWithTimezone(absence.report_time) + '\n';
+          messageHtml += 'Method: ' + (absence.report_method || 'SMS') + '\n';
+          messageHtml += '\n' + '─'.repeat(60) + '\n\n';
+
+          // Display full conversation if available
+          if (absence.conversation_transcript && absence.conversation_transcript.length > 0) {
+            absence.conversation_transcript.forEach(function(msg) {
+              const time = formatTimeWithTimezone(msg.timestamp);
+              const prefix = msg.from === 'employee' ? '👤 Employee' : '🤖 System';
+              messageHtml += '[' + time + '] ' + prefix + ':\n' + msg.message + '\n\n';
+            });
+          } else {
+            // Fallback to original message if no transcript
+            messageHtml += 'Original Message:\n' + (absence.report_message || 'No message recorded');
+          }
+
+          content.textContent = messageHtml;
+        } else {
+          content.textContent = 'Error loading message';
+        }
+      } catch (error) {
+        content.textContent = 'Error loading message: ' + error.message;
       }
     }
+
+    function closeSmsModal() {
+      document.getElementById('smsModal').style.display = 'none';
+    }
+
+    function formatTimeWithTimezone(dateString) {
+      if (!dateString) return '-';
+      const date = new Date(dateString);
+      return date.toLocaleTimeString('en-US', {
+        timeZone: orgTimezone,
+        hour: 'numeric',
+        minute: '2-digit',
+        second: '2-digit',
+        hour12: true
+      });
+    }
+
+    // ============================================
+    // UTILITY FUNCTIONS
+    // ============================================
+    function formatDateWithTimezone(dateString) {
+      if (!dateString) return '-';
+      const date = new Date(dateString);
+      return date.toLocaleDateString('en-US', {
+        timeZone: orgTimezone,
+        year: 'numeric',
+        month: 'numeric',
+        day: 'numeric'
+      });
+    }
+
+    function formatDateTimeWithTimezone(dateString) {
+      if (!dateString) return '-';
+      const date = new Date(dateString);
+      return date.toLocaleString('en-US', {
+        timeZone: orgTimezone,
+        year: 'numeric',
+        month: 'numeric',
+        day: 'numeric',
+        hour: 'numeric',
+        minute: '2-digit',
+        second: '2-digit',
+        hour12: true
+      });
+    }
+
+    function showMessage(el, type, msg) {
+      el.style.display = 'block';
+      if (type === 'success') {
+        el.style.background = '#d4edda';
+        el.style.color = '#155724';
+        el.style.border = '1px solid #c3e6cb';
+        el.textContent = '✓ ' + msg;
+      } else {
+        el.style.background = '#f8d7da';
+        el.style.color = '#721c24';
+        el.style.border = '1px solid #f5c6cb';
+        el.textContent = '✗ ' + msg;
+      }
+    }
+
+    function formatFileSize(bytes) {
+      if (bytes < 1024) return bytes + ' B';
+      if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+      return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+    }
+
+    function escapeHtml(text) {
+      const div = document.createElement('div');
+      div.textContent = text;
+      return div.innerHTML;
+    }
+
+    // ============================================
+    // PAGE LOAD
+    // ============================================
+    document.addEventListener('DOMContentLoaded', function() {
+      loadAMPNotes();
+      document.querySelectorAll('.type-badge').forEach(badge => {
+        badge.textContent = formatAbsenceType(badge.textContent.trim());
+      });
+    });
+
+    // Sidebar toggle (from existing code)
+    function toggleSidebar() {
+      const sidebar = document.querySelector('.sidebar');
+      const overlay = document.querySelector('.sidebar-overlay');
+      sidebar.classList.toggle('active');
+      overlay.classList.toggle('active');
+    }
+    document.querySelectorAll('.sidebar-link').forEach(link => {
+      link.addEventListener('click', () => {
+        if (window.innerWidth < 768) toggleSidebar();
+      });
+    });
   </script>
 </body>
 </html>

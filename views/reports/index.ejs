@@ -84,22 +84,18 @@
     </div>
 
     <!-- Statistics -->
-    <div class="stats-grid" style="margin-bottom: 2rem;">
+    <div class="stats-grid" style="margin-bottom: 2rem; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));">
       <div class="stat-card">
         <div class="stat-value"><%= stats.total %></div>
         <div class="stat-label">Total Absences</div>
       </div>
-      <div class="stat-card">
-        <div class="stat-value"><%= stats.sick %></div>
-        <div class="stat-label">Sick</div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-value"><%= stats.personal %></div>
-        <div class="stat-label">Personal</div>
-      </div>
-      <div class="stat-card">
+      <div class="stat-card stat-warning">
         <div class="stat-value"><%= stats.late %></div>
-        <div class="stat-label">Late</div>
+        <div class="stat-label">Total Lates</div>
+      </div>
+      <div class="stat-card stat-danger">
+        <div class="stat-value"><%= stats.hoursLost %></div>
+        <div class="stat-label">Manpower Hours Lost</div>
       </div>
     </div>
 

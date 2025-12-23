@@ -12,44 +12,81 @@
 
   <main class="main-with-sidebar">
     <h1>Admin Management</h1>
-    <p class="subtitle">Manage admin accounts for your organization</p>
+    <p class="subtitle">Manage admin accounts and system settings</p>
 
-    <!-- Organization Settings Section -->
-    <div class="card" style="margin-bottom: 2rem;">
-      <h2>SMS Parsing AI Model</h2>
-      <p style="color: #6b7280; margin-bottom: 1.5rem;">Choose which AI model to use for parsing employee SMS messages</p>
-
-      <div class="llm-provider-selection">
-        <label class="radio-card <%= organization?.settings?.llm_provider === 'claude' || !organization?.settings?.llm_provider ? 'active' : '' %>" onclick="updateLLMProvider('claude')">
-          <input type="radio" name="llm_provider" value="claude" <%= organization?.settings?.llm_provider === 'claude' || !organization?.settings?.llm_provider ? 'checked' : '' %>>
-          <div class="radio-card-content">
-            <div class="radio-card-header">
-              <span class="radio-card-icon">🤖</span>
-              <h3>Claude Opus 4.5</h3>
-            </div>
-            <p>Anthropic's most intelligent model. Excellent at understanding context and nuanced language.</p>
-          </div>
-        </label>
-
-        <label class="radio-card <%= organization?.settings?.llm_provider === 'openai' ? 'active' : '' %>" onclick="updateLLMProvider('openai')">
-          <input type="radio" name="llm_provider" value="openai" <%= organization?.settings?.llm_provider === 'openai' ? 'checked' : '' %>>
-          <div class="radio-card-content">
-            <div class="radio-card-header">
-              <span class="radio-card-icon">⚡</span>
-              <h3>GPT-5 Mini</h3>
-            </div>
-            <p>OpenAI's latest and most advanced mini model. Exceptional performance for structured parsing tasks.</p>
-          </div>
-        </label>
+    <!-- Current Admins -->
+    <div class="card" style="margin-bottom: 1.5rem;">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+        <h2 style="margin: 0;">Current Admins</h2>
+        <button onclick="showAddAdminModal()" class="btn btn-primary">+ Add Admin</button>
       </div>
+      <div class="table-responsive">
+        <table class="data-table">
+        <thead>
+          <tr>
+            <th>Name</th>
+            <th>Email</th>
+            <th>Role</th>
+            <th>Status</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% if (!admins || admins.length === 0) { %>
+            <tr>
+              <td colspan="5" class="no-data">No admins found</td>
+            </tr>
+          <% } else { %>
+            <% admins.forEach(admin => { %>
+              <tr>
+                <td><%= admin.name %></td>
+                <td><%= admin.email %></td>
+                <td>
+                  <% if (admin.role === 'super_admin') { %>
+                    <span class="user-role-badge super-admin">Super Admin</span>
+                  <% } else if (admin.role === 'admin') { %>
+                    <span class="user-role-badge admin">Admin</span>
+                  <% } else { %>
+                    <%= admin.role %>
+                  <% } %>
+                </td>
+                <td>
+                  <% if (admin.is_active) { %>
+                    <span style="color: #10b981; font-weight: 500;">Active</span>
+                  <% } else { %>
+                    <span style="color: #ef4444; font-weight: 500;">Inactive</span>
+                  <% } %>
+                </td>
+                <td>
+                  <% if (admin._id.toString() !== user._id.toString()) { %>
+                    <button onclick="deleteAdmin('<%= admin._id %>')" class="btn-small" style="background: #ef4444;">Delete</button>
+                  <% } else { %>
+                    <span style="color: #999;">-</span>
+                  <% } %>
+                </td>
+              </tr>
+            <% }); %>
+          <% } %>
+        </tbody>
+      </table>
+      </div>
+    </div>
 
-      <div id="llmStatusMessage" style="margin-top: 1rem; padding: 0.75rem; border-radius: 6px; display: none;"></div>
+    <!-- SMS System Status -->
+    <div class="card" style="margin-bottom: 1.5rem;">
+      <div style="display: flex; align-items: center; gap: 1rem;">
+        <div style="width: 12px; height: 12px; background: #10b981; border-radius: 50%; box-shadow: 0 0 8px rgba(16, 185, 129, 0.5);"></div>
+        <div>
+          <h2 style="margin: 0; font-size: 1.125rem;">SMS System Online</h2>
+          <p style="margin: 0.25rem 0 0 0; color: #6b7280; font-size: 0.875rem;">Automated SMS parsing is active</p>
+        </div>
+      </div>
     </div>
 
     <!-- Timezone Settings Section -->
-    <div class="card" style="margin-bottom: 2rem;">
-      <h2>Organization Timezone</h2>
-      <p style="color: #6b7280; margin-bottom: 1.5rem;">Set the timezone for your organization. All times and dates will be displayed in this timezone.</p>
+    <div class="card" style="margin-bottom: 1.5rem;">
+      <h2 style="font-size: 1.125rem;">Organization Timezone</h2>
+      <p style="color: #6b7280; margin-bottom: 1rem; font-size: 0.875rem;">Set the timezone for your organization. All times and dates will be displayed in this timezone.</p>
 
       <div class="form-group">
         <label for="timezoneSelect" style="display: block; margin-bottom: 0.5rem; font-weight: 600;">Timezone</label>
@@ -77,68 +114,63 @@
       <div id="timezoneStatusMessage" style="margin-top: 1rem; padding: 0.75rem; border-radius: 6px; display: none;"></div>
     </div>
 
-    <!-- Add Admin Button -->
-    <div style="margin-bottom: 2rem;">
-      <button onclick="showAddAdminModal()" class="btn btn-primary">+ Add Admin</button>
-    </div>
+    <!-- Shift Times Section -->
+    <div class="card" style="margin-bottom: 1.5rem;">
+      <h2 style="font-size: 1.125rem;">Shift Times Configuration</h2>
+      <p style="color: #6b7280; margin-bottom: 1rem; font-size: 0.875rem;">Configure start and end times for each shift. Used to calculate manpower hours lost.</p>
 
-    <!-- Admins List -->
-    <div class="card">
-      <h2>Current Admins</h2>
-      <div class="table-responsive">
-        <table class="data-table">
-        <thead>
-          <tr>
-            <th>Name</th>
-            <th>Email</th>
-            <th>Role</th>
-            <th>Status</th>
-            <th>Created</th>
-            <th>Actions</th>
-          </tr>
-        </thead>
-        <tbody>
-          <% if (admins.length === 0) { %>
-            <tr>
-              <td colspan="6" class="no-data">No admins found</td>
-            </tr>
-          <% } else { %>
-            <% admins.forEach(admin => { %>
-              <tr>
-                <td><%= admin.name %></td>
-                <td><%= admin.email %></td>
-                <td>
-                  <span class="status-badge <%= admin.role === 'super_admin' ? 'status-good' : 'status-watch' %>">
-                    <%= admin.role === 'super_admin' ? 'Super Admin' : 'Admin' %>
-                  </span>
-                </td>
-                <td>
-                  <span class="status-badge <%= admin.is_active ? 'status-good' : 'status-review_required' %>">
-                    <%= admin.is_active ? 'Active' : 'Disabled' %>
-                  </span>
-                </td>
-                <td>
-                  <% if (admin.created_at) { %>
-                    <%= new Date(admin.created_at).toLocaleDateString() %>
-                  <% } else { %>
-                    N/A
-                  <% } %>
-                </td>
-                <td>
-                  <% if (admin.role !== 'super_admin') { %>
-                    <button onclick="removeAdmin('<%= admin._id %>')" class="btn-small btn-danger">
-                      Remove
-                    </button>
-                  <% } else { %>
-                    <span style="color: #999;">-</span>
-                  <% } %>
-                </td>
-              </tr>
-            <% }); %>
-          <% } %>
-        </tbody>
-      </table>
+      <!-- Day Shift -->
+      <div style="background: #f8f9fa; padding: 1.5rem; border-radius: 8px; margin-bottom: 1.5rem;">
+        <h3 style="margin: 0 0 1rem 0; font-size: 1.125rem; color: #111827;">Day Shift</h3>
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem;">
+          <div class="form-group">
+            <label for="dayShiftStart" style="display: block; margin-bottom: 0.5rem; font-weight: 600;">Start Time</label>
+            <input type="time" id="dayShiftStart" class="timezone-select" value="<%= organization?.settings?.shift_times?.day_start || '07:00' %>" onchange="updateShiftTimes()">
+            <small style="color: #6b7280; display: block; margin-top: 0.5rem;">Default: 7:00 AM</small>
+          </div>
+          <div class="form-group">
+            <label for="dayShiftEnd" style="display: block; margin-bottom: 0.5rem; font-weight: 600;">End Time</label>
+            <input type="time" id="dayShiftEnd" class="timezone-select" value="<%= organization?.settings?.shift_times?.day_end || '15:00' %>" onchange="updateShiftTimes()">
+            <small style="color: #6b7280; display: block; margin-top: 0.5rem;">Default: 3:00 PM</small>
+          </div>
+        </div>
       </div>
+
+      <!-- Night Shift -->
+      <div style="background: #f8f9fa; padding: 1.5rem; border-radius: 8px; margin-bottom: 1.5rem;">
+        <h3 style="margin: 0 0 1rem 0; font-size: 1.125rem; color: #111827;">Night Shift</h3>
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem;">
+          <div class="form-group">
+            <label for="nightShiftStart" style="display: block; margin-bottom: 0.5rem; font-weight: 600;">Start Time</label>
+            <input type="time" id="nightShiftStart" class="timezone-select" value="<%= organization?.settings?.shift_times?.night_start || '19:00' %>" onchange="updateShiftTimes()">
+            <small style="color: #6b7280; display: block; margin-top: 0.5rem;">Default: 7:00 PM</small>
+          </div>
+          <div class="form-group">
+            <label for="nightShiftEnd" style="display: block; margin-bottom: 0.5rem; font-weight: 600;">End Time</label>
+            <input type="time" id="nightShiftEnd" class="timezone-select" value="<%= organization?.settings?.shift_times?.night_end || '03:00' %>" onchange="updateShiftTimes()">
+            <small style="color: #6b7280; display: block; margin-top: 0.5rem;">Default: 3:00 AM (next day)</small>
+          </div>
+        </div>
+      </div>
+
+      <!-- Weekend Shift -->
+      <div style="background: #f8f9fa; padding: 1.5rem; border-radius: 8px; margin-bottom: 1rem;">
+        <h3 style="margin: 0 0 1rem 0; font-size: 1.125rem; color: #111827;">Weekend Shift</h3>
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem;">
+          <div class="form-group">
+            <label for="weekendShiftStart" style="display: block; margin-bottom: 0.5rem; font-weight: 600;">Start Time</label>
+            <input type="time" id="weekendShiftStart" class="timezone-select" value="<%= organization?.settings?.shift_times?.weekend_start || '08:00' %>" onchange="updateShiftTimes()">
+            <small style="color: #6b7280; display: block; margin-top: 0.5rem;">Default: 8:00 AM</small>
+          </div>
+          <div class="form-group">
+            <label for="weekendShiftEnd" style="display: block; margin-bottom: 0.5rem; font-weight: 600;">End Time</label>
+            <input type="time" id="weekendShiftEnd" class="timezone-select" value="<%= organization?.settings?.shift_times?.weekend_end || '16:00' %>" onchange="updateShiftTimes()">
+            <small style="color: #6b7280; display: block; margin-top: 0.5rem;">Default: 4:00 PM</small>
+          </div>
+        </div>
+      </div>
+
+      <div id="shiftTimesStatusMessage" style="margin-top: 1rem; padding: 0.75rem; border-radius: 6px; display: none;"></div>
     </div>
   </main>
 
@@ -177,97 +209,6 @@
   </div>
 
   <style>
-    /* Radio Card Styles */
-    .llm-provider-selection {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 1rem;
-      margin-bottom: 1rem;
-    }
-
-    @media (max-width: 768px) {
-      .llm-provider-selection {
-        grid-template-columns: 1fr;
-      }
-    }
-
-    .radio-card {
-      position: relative;
-      padding: 1.5rem;
-      border: 2px solid #e5e7eb;
-      border-radius: 8px;
-      cursor: pointer;
-      transition: all 0.2s ease;
-      background: white;
-      display: block;
-    }
-
-    .radio-card:hover {
-      border-color: #4f46e5;
-      box-shadow: 0 4px 6px rgba(79, 70, 229, 0.1);
-    }
-
-    .radio-card.active {
-      border-color: #4f46e5;
-      background: #eef2ff;
-      box-shadow: 0 4px 6px rgba(79, 70, 229, 0.2);
-    }
-
-    .radio-card input[type="radio"] {
-      position: absolute;
-      opacity: 0;
-    }
-
-    .radio-card-content {
-      position: relative;
-    }
-
-    .radio-card-header {
-      display: flex;
-      align-items: center;
-      gap: 0.75rem;
-      margin-bottom: 0.5rem;
-    }
-
-    .radio-card-icon {
-      font-size: 1.5rem;
-    }
-
-    .radio-card h3 {
-      margin: 0;
-      font-size: 1.125rem;
-      font-weight: 600;
-      color: #111827;
-    }
-
-    .radio-card p {
-      margin: 0;
-      font-size: 0.875rem;
-      color: #6b7280;
-      line-height: 1.5;
-    }
-
-    .radio-card.active h3 {
-      color: #4f46e5;
-    }
-
-    .radio-card.active::after {
-      content: '✓';
-      position: absolute;
-      top: 1rem;
-      right: 1rem;
-      width: 24px;
-      height: 24px;
-      background: #4f46e5;
-      color: white;
-      border-radius: 50%;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-weight: bold;
-      font-size: 14px;
-    }
-
     /* Timezone Select Styles */
     .timezone-select {
       width: 100%;
@@ -292,49 +233,6 @@
   </style>
 
   <script>
-    // Update LLM Provider
-    async function updateLLMProvider(provider) {
-      const statusMessage = document.getElementById('llmStatusMessage');
-
-      try {
-        const response = await fetch('/api/organization/settings/llm-provider', {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ llm_provider: provider })
-        });
-
-        if (response.ok) {
-          // Update UI
-          document.querySelectorAll('.radio-card').forEach(card => card.classList.remove('active'));
-          document.querySelector(`input[value="${provider}"]`).closest('.radio-card').classList.add('active');
-
-          // Show success message
-          statusMessage.style.display = 'block';
-          statusMessage.style.background = '#d1fae5';
-          statusMessage.style.color = '#065f46';
-          statusMessage.style.border = '1px solid #10b981';
-          statusMessage.textContent = `✅ Successfully switched to ${provider === 'openai' ? 'OpenAI GPT-5 Mini' : 'Claude Opus 4.5'}`;
-
-          setTimeout(() => {
-            statusMessage.style.display = 'none';
-          }, 3000);
-        } else {
-          throw new Error('Failed to update LLM provider');
-        }
-      } catch (error) {
-        console.error('Error:', error);
-        statusMessage.style.display = 'block';
-        statusMessage.style.background = '#fee2e2';
-        statusMessage.style.color = '#991b1b';
-        statusMessage.style.border = '1px solid #ef4444';
-        statusMessage.textContent = '❌ Error updating LLM provider. Please try again.';
-
-        setTimeout(() => {
-          statusMessage.style.display = 'none';
-        }, 3000);
-      }
-    }
-
     // Update Timezone
     async function updateTimezone(timezone) {
       const statusMessage = document.getElementById('timezoneStatusMessage');
@@ -396,6 +294,58 @@
 
       const formatter = new Intl.DateTimeFormat('en-US', options);
       currentTimeElement.textContent = formatter.format(now);
+    }
+
+    // Update Shift Times
+    async function updateShiftTimes() {
+      const statusMessage = document.getElementById('shiftTimesStatusMessage');
+      const dayStart = document.getElementById('dayShiftStart').value;
+      const dayEnd = document.getElementById('dayShiftEnd').value;
+      const nightStart = document.getElementById('nightShiftStart').value;
+      const nightEnd = document.getElementById('nightShiftEnd').value;
+      const weekendStart = document.getElementById('weekendShiftStart').value;
+      const weekendEnd = document.getElementById('weekendShiftEnd').value;
+
+      try {
+        const response = await fetch('/api/organization/settings/shift-times', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            day_start: dayStart,
+            day_end: dayEnd,
+            night_start: nightStart,
+            night_end: nightEnd,
+            weekend_start: weekendStart,
+            weekend_end: weekendEnd
+          })
+        });
+
+        if (response.ok) {
+          // Show success message
+          statusMessage.style.display = 'block';
+          statusMessage.style.background = '#d1fae5';
+          statusMessage.style.color = '#065f46';
+          statusMessage.style.border = '1px solid #10b981';
+          statusMessage.textContent = '✅ Shift times updated successfully';
+
+          setTimeout(() => {
+            statusMessage.style.display = 'none';
+          }, 3000);
+        } else {
+          throw new Error('Failed to update shift times');
+        }
+      } catch (error) {
+        console.error('Error:', error);
+        statusMessage.style.display = 'block';
+        statusMessage.style.background = '#fee2e2';
+        statusMessage.style.color = '#991b1b';
+        statusMessage.style.border = '1px solid #ef4444';
+        statusMessage.textContent = '❌ Error updating shift times. Please try again.';
+
+        setTimeout(() => {
+          statusMessage.style.display = 'none';
+        }, 3000);
+      }
     }
 
     // Initialize timezone display on page load
