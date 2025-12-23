@@ -89,9 +89,18 @@ router.get('/api/data', async (req, res) => {
   try {
     const todaysSummary = await attendanceService.getTodaysSummary(req.organizationId);
 
+    // Get recent absence reports (last 10, tenant-scoped)
+    const recentAbsences = await Absence.find(scopeQuery(req.organizationId))
+      .populate('employee_id')
+      .sort({ report_time: -1 })
+      .limit(10)
+      .lean();
+
     res.json({
       success: true,
-      todaysSummary
+      todaysSummary,
+      recentAbsences,
+      lastUpdated: new Date().toISOString()
     });
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });

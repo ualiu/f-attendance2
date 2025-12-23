@@ -65,11 +65,11 @@ router.post('/incoming', async (req, res) => {
     console.log(`   🕐 Current time in ${orgTimezone}: ${currentTimeInTZ}`);
 
     // Get conversation state (if this is a follow-up)
-    let conversationState = smsService.getConversationState(phoneNumber);
+    let conversationState = await smsService.getConversationState(phoneNumber);
     const isFollowUp = conversationState !== null;
     console.log('   🔄 Is follow-up message:', isFollowUp);
     if (conversationState) {
-      console.log('   💬 Conversation state:', JSON.stringify(conversationState.collectedInfo, null, 2));
+      console.log('   💬 Conversation state:', JSON.stringify(conversationState.collected_info, null, 2));
     }
 
     // Initialize transcript array if this is a new conversation
@@ -91,7 +91,7 @@ router.post('/incoming', async (req, res) => {
     console.log('   📝 Transcript contents:', JSON.stringify(conversationState.transcript, null, 2));
 
     // Add current message to conversation state (before parsing) - pass transcript to preserve it
-    conversationState = smsService.updateConversationState(phoneNumber, messageBody, null, null, conversationState.transcript);
+    conversationState = await smsService.updateConversationState(phoneNumber, messageBody, null, null, conversationState.transcript);
     console.log('   📝 After updateConversationState. Transcript length:', conversationState.transcript.length);
 
     // Parse the SMS message using LLM with conversation context and timezone
@@ -166,7 +166,7 @@ router.post('/incoming', async (req, res) => {
       });
 
       // Update conversation state with parsed data, question asked, and transcript
-      conversationState = smsService.updateConversationState(phoneNumber, null, parsedData, questionAsked, conversationState.transcript);
+      conversationState = await smsService.updateConversationState(phoneNumber, null, parsedData, questionAsked, conversationState.transcript);
 
       twiml.message(followUpMessage);
       console.log('   📤 Follow-up message:', followUpMessage);
@@ -199,7 +199,7 @@ router.post('/incoming', async (req, res) => {
     console.log('   ✅ Absence logged:', absence._id);
 
     // Clear conversation state since we successfully logged the absence
-    smsService.clearConversation(phoneNumber);
+    await smsService.clearConversation(phoneNumber);
     console.log('   🧹 Conversation cleared');
 
     console.log('   📤 Sending response:', responseMessage);

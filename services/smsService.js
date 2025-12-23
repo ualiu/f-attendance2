@@ -1,105 +1,144 @@
 const Anthropic = require('@anthropic-ai/sdk');
 const Absence = require('../models/Absence');
+const ConversationState = require('../models/ConversationState');
 const attendanceService = require('./attendanceService');
 
 const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY,
 });
 
-// Track recent conversations with full state
-// Key: phone number, Value: { timestamp, messages, collectedInfo }
-const recentConversations = new Map();
+// Check if this is a continuation of a recent conversation (within 15 minutes)
+exports.isFollowUpMessage = async (phoneNumber) => {
+  try {
+    const conversation = await ConversationState.findOne({
+      phone_number: phoneNumber,
+      expires_at: { $gt: new Date() } // Only get non-expired conversations
+    });
 
-// Check if this is a continuation of a recent conversation (within 10 minutes)
-exports.isFollowUpMessage = (phoneNumber) => {
-  const conversation = recentConversations.get(phoneNumber);
-  if (!conversation) return false;
+    if (!conversation) return false;
 
-  const tenMinutesAgo = Date.now() - (10 * 60 * 1000); // 10 minutes
-  const isFollowUp = conversation.timestamp > tenMinutesAgo;
+    const fifteenMinutesAgo = Date.now() - (15 * 60 * 1000); // 15 minutes
+    const isFollowUp = conversation.timestamp.getTime() > fifteenMinutesAgo;
 
-  return isFollowUp;
+    return isFollowUp;
+  } catch (error) {
+    console.error('Error checking follow-up message:', error);
+    return false; // Fail gracefully - treat as new conversation
+  }
 };
 
 // Get conversation state
-exports.getConversationState = (phoneNumber) => {
-  const conversation = recentConversations.get(phoneNumber);
-  if (!conversation) return null;
+exports.getConversationState = async (phoneNumber) => {
+  try {
+    const conversation = await ConversationState.findOne({
+      phone_number: phoneNumber,
+      expires_at: { $gt: new Date() } // Only get non-expired conversations
+    });
 
-  const tenMinutesAgo = Date.now() - (10 * 60 * 1000);
-  if (conversation.timestamp < tenMinutesAgo) {
-    // Conversation expired
-    recentConversations.delete(phoneNumber);
-    return null;
+    if (!conversation) return null;
+
+    const fifteenMinutesAgo = Date.now() - (15 * 60 * 1000);
+    if (conversation.timestamp.getTime() < fifteenMinutesAgo) {
+      // Conversation expired - delete it
+      await ConversationState.deleteOne({ _id: conversation._id });
+      return null;
+    }
+
+    return conversation;
+  } catch (error) {
+    console.error('Error getting conversation state:', error);
+    return null; // Fail gracefully
   }
-
-  return conversation;
 };
 
 // Update conversation state
-exports.updateConversationState = (phoneNumber, messageBody, parsedData, questionAsked = null, transcript = null) => {
-  const existing = recentConversations.get(phoneNumber) || {
-    messages: [],
-    collectedInfo: {},
-    transcript: []
-  };
+exports.updateConversationState = async (phoneNumber, messageBody, parsedData, questionAsked = null, transcript = null) => {
+  try {
+    // Find existing conversation or prepare new one
+    let existing = await ConversationState.findOne({ phone_number: phoneNumber });
 
-  existing.timestamp = Date.now();
-  if (messageBody) {
-    existing.messages.push({
-      text: messageBody,
-      timestamp: Date.now()
-    });
-  }
-
-  // Preserve transcript if passed in (to avoid losing it on reassignment)
-  if (transcript) {
-    existing.transcript = transcript;
-  } else if (!existing.transcript) {
-    existing.transcript = [];
-  }
-
-  // Update collected info
-  if (parsedData) {
-    if (parsedData.type && !existing.collectedInfo.type) {
-      existing.collectedInfo.type = parsedData.type;
+    if (!existing) {
+      existing = new ConversationState({
+        phone_number: phoneNumber,
+        messages: [],
+        collected_info: {},
+        transcript: [],
+        timestamp: new Date(),
+        expires_at: new Date(Date.now() + 15 * 60 * 1000) // 15 minutes from now
+      });
     }
-    if (parsedData.subtype && !existing.collectedInfo.subtype) {
-      existing.collectedInfo.subtype = parsedData.subtype;
+
+    // Update timestamp and expiration
+    existing.timestamp = new Date();
+    existing.expires_at = new Date(Date.now() + 15 * 60 * 1000); // Extend expiration
+
+    // Add message if provided
+    if (messageBody) {
+      existing.messages.push({
+        text: messageBody,
+        timestamp: new Date()
+      });
     }
-    if (parsedData.reason && !existing.collectedInfo.reason) {
-      existing.collectedInfo.reason = parsedData.reason;
+
+    // Preserve transcript if passed in (to avoid losing it on reassignment)
+    if (transcript) {
+      existing.transcript = transcript;
+    } else if (!existing.transcript) {
+      existing.transcript = [];
     }
-    if (parsedData.duration_minutes && !existing.collectedInfo.duration_minutes) {
-      existing.collectedInfo.duration_minutes = parsedData.duration_minutes;
+
+    // Update collected info
+    if (parsedData) {
+      if (!existing.collected_info) {
+        existing.collected_info = {};
+      }
+
+      if (parsedData.type && !existing.collected_info.type) {
+        existing.collected_info.type = parsedData.type;
+      }
+      if (parsedData.subtype && !existing.collected_info.subtype) {
+        existing.collected_info.subtype = parsedData.subtype;
+      }
+      if (parsedData.reason && !existing.collected_info.reason) {
+        existing.collected_info.reason = parsedData.reason;
+      }
+      if (parsedData.duration_minutes && !existing.collected_info.duration_minutes) {
+        existing.collected_info.duration_minutes = parsedData.duration_minutes;
+      }
     }
+
+    if (questionAsked) {
+      existing.last_question_asked = questionAsked;
+    }
+
+    // Save to database
+    await existing.save();
+
+    // Clean up old entries (over 20 minutes old) - MongoDB TTL will handle this automatically
+    // But we can also do a manual cleanup occasionally (use 20 min to be safe beyond 15 min TTL)
+    const twentyMinutesAgo = new Date(Date.now() - 20 * 60 * 1000);
+    await ConversationState.deleteMany({ timestamp: { $lt: twentyMinutesAgo } });
+
+    return existing;
+  } catch (error) {
+    console.error('Error updating conversation state:', error);
+    throw error;
   }
-
-  if (questionAsked) {
-    existing.lastQuestionAsked = questionAsked;
-  }
-
-  recentConversations.set(phoneNumber, existing);
-
-  // Clean up old entries (over 15 minutes old)
-  const fifteenMinutesAgo = Date.now() - (15 * 60 * 1000);
-  for (const [phone, conv] of recentConversations.entries()) {
-    if (conv.timestamp < fifteenMinutesAgo) {
-      recentConversations.delete(phone);
-    }
-  }
-
-  return existing;
 };
 
 // Clear conversation (when successfully logged)
-exports.clearConversation = (phoneNumber) => {
-  recentConversations.delete(phoneNumber);
+exports.clearConversation = async (phoneNumber) => {
+  try {
+    await ConversationState.deleteOne({ phone_number: phoneNumber });
+  } catch (error) {
+    console.error('Error clearing conversation:', error);
+    // Don't throw - this is a cleanup operation
+  }
 };
 
 // Legacy function for backward compatibility
-exports.markConversationActive = (phoneNumber) => {
-  exports.updateConversationState(phoneNumber, null, null);
+exports.markConversationActive = async (phoneNumber) => {
+  return await exports.updateConversationState(phoneNumber, null, null);
 };
 
 // Parse attendance message using Claude

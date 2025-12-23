@@ -121,8 +121,8 @@ router.get('/', async (req, res) => {
     let totalHoursLost = 0;
 
     for (const absence of absences) {
-      // Get employee to determine shift
-      const employee = await Employee.findById(absence.employee_id);
+      // Use populated employee data (already loaded via populate)
+      const employee = absence.employee_id;
       if (!employee || !employee.shift) continue;
 
       if (absence.type === 'late') {

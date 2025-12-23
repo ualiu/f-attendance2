@@ -1,10 +1,11 @@
 // Dashboard JavaScript
 
-// Auto-refresh dashboard data every 30 seconds
+// Auto-refresh dashboard data every 60 seconds (reduced from 30 for efficiency)
 let refreshInterval;
+let lastUpdateTimestamp = null;
 
 function startAutoRefresh() {
-  refreshInterval = setInterval(refreshDashboardData, 30000); // 30 seconds
+  refreshInterval = setInterval(refreshDashboardData, 60000); // 60 seconds
 }
 
 function stopAutoRefresh() {
@@ -18,7 +19,12 @@ async function refreshDashboardData() {
     const response = await fetch('/dashboard/api/data');
     if (response.ok) {
       const data = await response.json();
-      updateDashboard(data);
+
+      // Only update if data has changed (compare timestamps)
+      if (data.lastUpdated && data.lastUpdated !== lastUpdateTimestamp) {
+        updateDashboard(data);
+        lastUpdateTimestamp = data.lastUpdated;
+      }
     }
   } catch (error) {
     console.error('Error refreshing dashboard:', error);
@@ -26,9 +32,88 @@ async function refreshDashboardData() {
 }
 
 function updateDashboard(data) {
-  // This would update the dashboard with fresh data
-  // For simplicity, we'll just log it
-  console.log('Dashboard data refreshed:', data);
+  if (!data.success) return;
+
+  // Update stats cards
+  const statsCards = document.querySelectorAll('.stat-value');
+  if (statsCards.length >= 4) {
+    statsCards[0].textContent = data.todaysSummary.totalEmployees || 0;
+    statsCards[1].textContent = data.todaysSummary.presentCount || 0;
+    statsCards[2].textContent = data.todaysSummary.absentCount || 0;
+    statsCards[3].textContent = data.todaysSummary.lateCount || 0;
+  }
+
+  // Update recent absences table if data is available
+  if (data.recentAbsences && data.recentAbsences.length > 0) {
+    const tbody = document.querySelector('.absences-table tbody');
+    if (tbody) {
+      updateAbsencesTable(tbody, data.recentAbsences);
+    }
+  }
+
+  console.log('Dashboard updated at:', new Date(data.lastUpdated).toLocaleTimeString());
+}
+
+function updateAbsencesTable(tbody, absences) {
+  // Clear existing rows
+  tbody.innerHTML = '';
+
+  if (absences.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="5" class="no-data">No recent reports</td></tr>';
+    return;
+  }
+
+  // Add new rows
+  absences.forEach(absence => {
+    const row = document.createElement('tr');
+
+    // Time cell
+    const timeCell = document.createElement('td');
+    timeCell.className = 'date-time-cell';
+    timeCell.setAttribute('data-timestamp', absence.report_time || '');
+    if (absence.report_time && typeof formatDateTimeWithTimezone === 'function') {
+      timeCell.textContent = formatDateTimeWithTimezone(absence.report_time);
+    } else {
+      timeCell.textContent = absence.report_time ? new Date(absence.report_time).toLocaleString() : 'N/A';
+    }
+
+    // Employee cell
+    const employeeCell = document.createElement('td');
+    const employeeLink = document.createElement('a');
+    employeeLink.href = `/dashboard/employee/${absence.employee_id?._id || absence.employee_id}`;
+    employeeLink.textContent = absence.employee_name;
+    employeeCell.appendChild(employeeLink);
+
+    // Type cell
+    const typeCell = document.createElement('td');
+    const typeBadge = document.createElement('span');
+    typeBadge.className = `type-badge type-${absence.type}`;
+    typeBadge.textContent = typeof formatAbsenceType === 'function' ? formatAbsenceType(absence.type) : absence.type;
+    typeCell.appendChild(typeBadge);
+
+    // Reason cell
+    const reasonCell = document.createElement('td');
+    reasonCell.textContent = absence.reason || '';
+
+    // Actions cell
+    const actionsCell = document.createElement('td');
+    if (absence.report_message) {
+      const viewButton = document.createElement('button');
+      viewButton.className = 'btn-small';
+      viewButton.textContent = 'View SMS';
+      viewButton.onclick = () => viewMessage(absence._id);
+      actionsCell.appendChild(viewButton);
+    }
+
+    // Append cells to row
+    row.appendChild(timeCell);
+    row.appendChild(employeeCell);
+    row.appendChild(typeCell);
+    row.appendChild(reasonCell);
+    row.appendChild(actionsCell);
+
+    tbody.appendChild(row);
+  });
 }
 
 // View message modal

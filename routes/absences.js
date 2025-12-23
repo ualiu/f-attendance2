@@ -23,22 +23,40 @@ router.get('/:id/details', async (req, res) => {
   }
 });
 
-// Get recent reports
+// Get recent reports (with pagination)
 router.get('/', async (req, res) => {
   try {
-    const { limit = 20, employee_id } = req.query;
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 50; // Default 50 per page
+    const skip = (page - 1) * limit;
+    const { employee_id } = req.query;
 
     const query = {};
     if (employee_id) {
       query.employee_id = employee_id;
     }
 
-    const absences = await Absence.find(scopeQuery(req.organizationId, query))
+    const scopedQuery = scopeQuery(req.organizationId, query);
+
+    // Get total count for pagination metadata
+    const total = await Absence.countDocuments(scopedQuery);
+
+    const absences = await Absence.find(scopedQuery)
       .populate('employee_id')
       .sort({ report_time: -1 })
-      .limit(parseInt(limit));
+      .skip(skip)
+      .limit(limit);
 
-    res.json({ success: true, absences });
+    res.json({
+      success: true,
+      absences,
+      pagination: {
+        page,
+        limit,
+        total,
+        pages: Math.ceil(total / limit)
+      }
+    });
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
   }

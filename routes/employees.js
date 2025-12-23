@@ -13,14 +13,34 @@ const { ampDocumentUpload, FILE_TYPE_MAP } = require('../config/multer');
 // All employee routes require authentication + tenant scoping
 router.use(requireTenantAuth);
 
-// Get all employees (tenant-scoped)
+// Get all employees (tenant-scoped with pagination)
 router.get('/', async (req, res) => {
   try {
-    const employees = await Employee.find(scopeQuery(req.organizationId))
-      .populate('supervisor_id')
-      .sort({ name: 1 });
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 100; // Default 100 per page
+    const skip = (page - 1) * limit;
 
-    res.json({ success: true, employees });
+    const query = scopeQuery(req.organizationId);
+
+    // Get total count for pagination metadata
+    const total = await Employee.countDocuments(query);
+
+    const employees = await Employee.find(query)
+      .populate('supervisor_id')
+      .sort({ name: 1 })
+      .skip(skip)
+      .limit(limit);
+
+    res.json({
+      success: true,
+      employees,
+      pagination: {
+        page,
+        limit,
+        total,
+        pages: Math.ceil(total / limit)
+      }
+    });
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
   }
