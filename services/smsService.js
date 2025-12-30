@@ -7,26 +7,6 @@ const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY,
 });
 
-// Check if this is a continuation of a recent conversation (within 15 minutes)
-exports.isFollowUpMessage = async (phoneNumber) => {
-  try {
-    const conversation = await ConversationState.findOne({
-      phone_number: phoneNumber,
-      expires_at: { $gt: new Date() } // Only get non-expired conversations
-    });
-
-    if (!conversation) return false;
-
-    const fifteenMinutesAgo = Date.now() - (15 * 60 * 1000); // 15 minutes
-    const isFollowUp = conversation.timestamp.getTime() > fifteenMinutesAgo;
-
-    return isFollowUp;
-  } catch (error) {
-    console.error('Error checking follow-up message:', error);
-    return false; // Fail gracefully - treat as new conversation
-  }
-};
-
 // Get conversation state
 exports.getConversationState = async (phoneNumber) => {
   try {
@@ -134,11 +114,6 @@ exports.clearConversation = async (phoneNumber) => {
     console.error('Error clearing conversation:', error);
     // Don't throw - this is a cleanup operation
   }
-};
-
-// Legacy function for backward compatibility
-exports.markConversationActive = async (phoneNumber) => {
-  return await exports.updateConversationState(phoneNumber, null, null);
 };
 
 // Parse attendance message using Claude

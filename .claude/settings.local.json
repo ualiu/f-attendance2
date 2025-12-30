@@ -18,7 +18,10 @@
       "WebFetch(domain:platform.openai.com)",
       "WebSearch",
       "Bash(npm start)",
-      "Bash(node scripts/check-recent-absence.js:*)"
+      "Bash(node scripts/check-recent-absence.js:*)",
+      "Bash(git -C \"C:/Users/Urim Aliu/Desktop/fun-projects/felton-attendance\" log --oneline -15)",
+      "WebFetch(domain:www.reddit.com)",
+      "Bash(timeout 10 npm start:*)"
     ],
     "deny": [],
     "ask": []

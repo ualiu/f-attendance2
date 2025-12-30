@@ -78,33 +78,3 @@ exports.validateTenantAccess = async (Model, resourceId, organizationId) => {
 
   return resource;
 };
-
-/**
- * Validate that multiple resources belong to the user's organization
- *
- * @param {Model} Model - Mongoose model class
- * @param {Array<ObjectId>} resourceIds - Array of resource IDs to validate
- * @param {ObjectId} organizationId - The organization ID from req.organizationId
- * @returns {Promise<Array<Document>>} Array of resources if all are owned by organization
- * @throws {Error} If any resource not found or belongs to different organization
- */
-exports.validateTenantAccessBulk = async (Model, resourceIds, organizationId) => {
-  if (!organizationId) {
-    throw new Error('organizationId is required for access validation');
-  }
-
-  if (!Array.isArray(resourceIds) || resourceIds.length === 0) {
-    throw new Error('resourceIds must be a non-empty array');
-  }
-
-  const resources = await Model.find({
-    _id: { $in: resourceIds },
-    organization_id: organizationId
-  });
-
-  if (resources.length !== resourceIds.length) {
-    throw new Error('One or more resources not found or access denied');
-  }
-
-  return resources;
-};

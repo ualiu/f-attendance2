@@ -23,8 +23,8 @@ router.get('/', async (req, res) => {
     const day = now.getUTCDate();
     const today = new Date(Date.UTC(year, month, day, 0, 0, 0, 0));
 
-    if (startDate && endDate) {
-      // Custom date range
+    if (range === 'custom' && startDate && endDate) {
+      // Custom date range - only when explicitly selected
       start = new Date(startDate);
       end = new Date(endDate);
       end.setUTCHours(23, 59, 59, 999);

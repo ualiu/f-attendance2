@@ -45,12 +45,6 @@ exports.attachOrganization = (req, res, next) => {
   res.status(500).send('User account not properly configured. Please contact support.');
 };
 
-// Combined middleware for protected routes
-exports.requireAuth = [
-  exports.ensureAuthenticated,
-  exports.ensureActive
-];
-
 // Combined middleware for tenant-scoped routes (most routes should use this)
 exports.requireTenantAuth = [
   exports.ensureAuthenticated,
