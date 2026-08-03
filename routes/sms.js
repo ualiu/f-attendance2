@@ -47,7 +47,8 @@ router.post('/incoming', async (req, res) => {
     const organization = await Organization.findById(employee.organization_id);
     const organizationName = organization ? organization.name : 'your company';
 
-    console.log('   🤖 Using Claude AI for SMS parsing');
+    const llmProvider = organization?.settings?.llm_provider || 'claude';
+    console.log(`   🤖 Using ${llmProvider.toUpperCase()} for SMS parsing`);
 
     // Get organization timezone and current time
     const orgTimezone = organization?.settings?.timezone || 'America/New_York';
@@ -98,7 +99,7 @@ router.post('/incoming', async (req, res) => {
     const parsedData = await smsService.parseAttendanceMessage(messageBody, employee, organizationName, conversationState, {
       timezone: orgTimezone,
       currentTime: currentTimeInTZ
-    });
+    }, llmProvider);
 
     console.log('   📋 Parsed data:', parsedData);
 

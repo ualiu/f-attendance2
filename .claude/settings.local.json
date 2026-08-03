@@ -21,7 +21,8 @@
       "Bash(node scripts/check-recent-absence.js:*)",
       "Bash(git -C \"C:/Users/Urim Aliu/Desktop/fun-projects/felton-attendance\" log --oneline -15)",
       "WebFetch(domain:www.reddit.com)",
-      "Bash(timeout 10 npm start:*)"
+      "Bash(timeout 10 npm start:*)",
+      "Bash(powershell -c \"if \\(Select-String -Path .env -Pattern '^OPENAI_API_KEY=.+'\\) { 'OPENAI_API_KEY is set' } else { 'OPENAI_API_KEY is EMPTY' }\")"
     ],
     "deny": [],
     "ask": []

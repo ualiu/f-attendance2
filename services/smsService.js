@@ -1,4 +1,5 @@
 const Anthropic = require('@anthropic-ai/sdk');
+const OpenAI = require('openai');
 const Absence = require('../models/Absence');
 const ConversationState = require('../models/ConversationState');
 const attendanceService = require('./attendanceService');
@@ -6,6 +7,33 @@ const attendanceService = require('./attendanceService');
 const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY,
 });
+
+const openai = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY,
+});
+
+// Call the configured LLM provider and return the raw text response
+async function callLLM(prompt, { provider = 'claude', maxTokens = 500 } = {}) {
+  if (provider === 'openai') {
+    console.log('   🔄 Calling OpenAI API...');
+    const completion = await openai.chat.completions.create({
+      model: process.env.OPENAI_MODEL || 'gpt-4o',
+      max_tokens: maxTokens,
+      messages: [{ role: 'user', content: prompt }]
+    });
+    console.log('   ✅ OpenAI API responded');
+    return completion.choices[0].message.content;
+  }
+
+  console.log('   🔄 Calling Claude API...');
+  const message = await anthropic.messages.create({
+    model: 'claude-opus-4-5-20251101',
+    max_tokens: maxTokens,
+    messages: [{ role: 'user', content: prompt }]
+  });
+  console.log('   ✅ Claude API responded');
+  return message.content[0].text;
+}
 
 // Get conversation state
 exports.getConversationState = async (phoneNumber) => {
@@ -117,7 +145,7 @@ exports.clearConversation = async (phoneNumber) => {
 };
 
 // Parse attendance message using Claude
-exports.parseAttendanceMessage = async (messageBody, employee, organizationName = 'your company', conversationState = null, timezoneContext = null) => {
+exports.parseAttendanceMessage = async (messageBody, employee, organizationName = 'your company', conversationState = null, timezoneContext = null, llmProvider = 'claude') => {
   try {
     // Build conversation context if this is a follow-up
     let conversationContext = '';
@@ -598,21 +626,11 @@ Field Definitions:
 
 RESPOND WITH JSON ONLY - NO EXPLANATIONS!`;
 
-    console.log('   🔄 Calling Claude API...');
     console.log('   📝 Message to parse:', messageBody);
+    console.log('   🧠 LLM provider:', llmProvider);
 
-    const message = await anthropic.messages.create({
-      model: 'claude-opus-4-5-20251101',
-      max_tokens: 500,
-      messages: [{
-        role: 'user',
-        content: prompt
-      }]
-    });
-
-    console.log('   ✅ Claude API responded');
-    let responseText = message.content[0].text;
-    console.log('   🤖 Claude response:', responseText);
+    let responseText = await callLLM(prompt, { provider: llmProvider, maxTokens: 500 });
+    console.log('   🤖 LLM response:', responseText);
 
     // Strip markdown code blocks if present
     responseText = responseText.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();

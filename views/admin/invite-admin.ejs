@@ -83,6 +83,22 @@
       </div>
     </div>
 
+    <!-- AI Provider Settings Section -->
+    <div class="card" style="margin-bottom: 1.5rem;">
+      <h2 style="font-size: 1.125rem;">AI Provider</h2>
+      <p style="color: #6b7280; margin-bottom: 1rem; font-size: 0.875rem;">Choose which AI provider parses incoming SMS messages and generates employee reports.</p>
+
+      <div class="form-group">
+        <label for="llmProviderSelect" style="display: block; margin-bottom: 0.5rem; font-weight: 600;">Provider</label>
+        <select id="llmProviderSelect" class="timezone-select" onchange="updateLLMProvider(this.value)">
+          <option value="claude" <%= (organization?.settings?.llm_provider || 'claude') === 'claude' ? 'selected' : '' %>>Claude (Anthropic)</option>
+          <option value="openai" <%= organization?.settings?.llm_provider === 'openai' ? 'selected' : '' %>>OpenAI (GPT)</option>
+        </select>
+      </div>
+
+      <div id="llmProviderStatusMessage" style="margin-top: 1rem; padding: 0.75rem; border-radius: 6px; display: none;"></div>
+    </div>
+
     <!-- Timezone Settings Section -->
     <div class="card" style="margin-bottom: 1.5rem;">
       <h2 style="font-size: 1.125rem;">Organization Timezone</h2>
@@ -233,6 +249,42 @@
   </style>
 
   <script>
+    // Update AI Provider
+    async function updateLLMProvider(llm_provider) {
+      const statusMessage = document.getElementById('llmProviderStatusMessage');
+
+      try {
+        const response = await fetch('/api/organization/settings/llm-provider', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ llm_provider })
+        });
+
+        const result = await response.json();
+
+        if (response.ok && result.success) {
+          statusMessage.style.display = 'block';
+          statusMessage.style.background = '#d1fae5';
+          statusMessage.style.color = '#065f46';
+          statusMessage.style.border = '1px solid #10b981';
+          statusMessage.textContent = `✅ AI provider switched to ${llm_provider === 'openai' ? 'OpenAI (GPT)' : 'Claude (Anthropic)'}`;
+        } else {
+          throw new Error(result.error || 'Failed to update AI provider');
+        }
+      } catch (error) {
+        console.error('Error:', error);
+        statusMessage.style.display = 'block';
+        statusMessage.style.background = '#fee2e2';
+        statusMessage.style.color = '#991b1b';
+        statusMessage.style.border = '1px solid #ef4444';
+        statusMessage.textContent = '❌ ' + error.message;
+      } finally {
+        setTimeout(() => {
+          statusMessage.style.display = 'none';
+        }, 3000);
+      }
+    }
+
     // Update Timezone
     async function updateTimezone(timezone) {
       const statusMessage = document.getElementById('timezoneStatusMessage');

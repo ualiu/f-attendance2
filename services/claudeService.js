@@ -1,10 +1,35 @@
 const Anthropic = require('@anthropic-ai/sdk');
+const OpenAI = require('openai');
 const Employee = require('../models/Employee');
 const Absence = require('../models/Absence');
+const Organization = require('../models/Organization');
 
 const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY
 });
+
+const openai = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY
+});
+
+// Call the configured LLM provider and return the raw text response
+async function callLLM(prompt, { provider = 'claude', maxTokens = 2000 } = {}) {
+  if (provider === 'openai') {
+    const completion = await openai.chat.completions.create({
+      model: process.env.OPENAI_MODEL || 'gpt-4o',
+      max_tokens: maxTokens,
+      messages: [{ role: 'user', content: prompt }]
+    });
+    return completion.choices[0].message.content;
+  }
+
+  const message = await anthropic.messages.create({
+    model: 'claude-opus-4-5-20251101',
+    max_tokens: maxTokens,
+    messages: [{ role: 'user', content: prompt }]
+  });
+  return message.content[0].text;
+}
 
 // Helper to scope queries by organization
 const scopeQuery = (organizationId, baseQuery = {}) => {
@@ -64,18 +89,16 @@ ${absences.map(a => `${a.date.toLocaleDateString()}: ${a.type} - ${a.reason} (${
 Keep it short and practical. Use simple words. Skip the corporate speak.
   `;
 
-  // 5. Call Claude API (using same model as SMS service for consistency)
-  const message = await anthropic.messages.create({
-    model: 'claude-opus-4-5-20251101',
-    max_tokens: 2000,
-    messages: [{ role: 'user', content: prompt }]
-  });
+  // 5. Call the organization's configured LLM provider
+  const organization = await Organization.findById(organizationId);
+  const llmProvider = organization?.settings?.llm_provider || 'claude';
+  const analysis = await callLLM(prompt, { provider: llmProvider, maxTokens: 2000 });
 
-  // 5. Return formatted report
+  // 6. Return formatted report
   return {
     employee,
     absences,
-    analysis: message.content[0].text,
+    analysis,
     generated_at: new Date()
   };
 };

@@ -97,12 +97,12 @@ app.use('/api/organization', require('./routes/organization'));
 app.use('/api/sms', require('./routes/sms'));
 app.use('/reports', require('./routes/reports'));
 
-// Root redirect
+// Root route - landing page
 app.get('/', (req, res) => {
   if (req.isAuthenticated()) {
     res.redirect('/dashboard');
   } else {
-    res.redirect('/login');
+    res.render('landing');
   }
 });
 
