@@ -138,31 +138,6 @@
         overflow-wrap: break-word;
       }
 
-      .cta-button {
-        display: inline-block;
-        background: var(--text-primary);
-        color: var(--background);
-        padding: 0.875rem 2.25rem;
-        border-radius: 8px;
-        text-decoration: none;
-        font-weight: 600;
-        font-size: 1rem;
-        transition: all 0.2s;
-        border: 1px solid var(--text-primary);
-        min-width: 190px;
-        text-align: center;
-        touch-action: manipulation;
-      }
-
-      .cta-button:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 8px 24px rgba(246, 247, 246, 0.14);
-      }
-
-      .cta-button:active {
-        transform: translateY(0);
-      }
-
       /* Demo */
       .demo {
         padding: 1rem 5% 5rem;
@@ -306,6 +281,51 @@
         overflow-wrap: break-word;
       }
 
+      /* Closing CTA */
+      .cta-section {
+        text-align: center;
+        padding: 5rem 5%;
+        border-top: 1px solid var(--border);
+        flex-shrink: 0;
+      }
+
+      .cta-section h2 {
+        font-size: clamp(1.5rem, 3.5vw, 2rem);
+        font-weight: 600;
+        letter-spacing: -0.02em;
+        color: var(--text-primary);
+        margin-bottom: 0.75rem;
+      }
+
+      .cta-section p {
+        color: var(--text-secondary);
+        max-width: 520px;
+        margin: 0 auto 2rem;
+        font-size: 1rem;
+        line-height: 1.7;
+      }
+
+      /* Pill variant - outlined rather than filled so it reads as a softer,
+         secondary ask than the hero button. */
+      .cta-button-outline {
+        display: inline-block;
+        padding: 0.8125rem 2rem;
+        border: 1px solid var(--border-strong);
+        border-radius: 999px;
+        color: var(--text-primary);
+        background: transparent;
+        text-decoration: none;
+        font-weight: 600;
+        font-size: 0.9375rem;
+        transition: all 0.2s;
+        touch-action: manipulation;
+      }
+
+      .cta-button-outline:hover {
+        background: var(--text-primary);
+        color: var(--background);
+      }
+
       /* Footer */
       .footer {
         text-align: center;
@@ -348,6 +368,10 @@
           padding: 3rem 4%;
         }
 
+        .cta-section {
+          padding: 3.5rem 4%;
+        }
+
         .features h2 {
           margin-bottom: 2rem;
         }
@@ -384,12 +408,6 @@
           padding: 3rem 5% 2.5rem;
         }
 
-        .cta-button {
-          padding: 0.875rem 2rem;
-          width: 100%;
-          max-width: 320px;
-        }
-
         .demo {
           padding: 1rem 5% 3rem;
         }
@@ -401,6 +419,15 @@
 
         .features {
           padding: 2.5rem 5%;
+        }
+
+        .cta-section {
+          padding: 3rem 5%;
+        }
+
+        .cta-button-outline {
+          width: 100%;
+          max-width: 320px;
         }
 
         .features-grid {
@@ -444,9 +471,9 @@
           font-size: 1.625rem;
         }
 
-        .cta-button {
+        .cta-button-outline {
           padding: 0.75rem 1.5rem;
-          font-size: 0.9375rem;
+          font-size: 0.875rem;
         }
 
         .demo-body {
@@ -480,7 +507,7 @@
 
       /* Touch device optimizations */
       @media (hover: none) and (pointer: coarse) {
-        .cta-button,
+        .cta-button-outline,
         .nav-links a {
           min-height: 44px;
           display: inline-flex;
@@ -489,7 +516,7 @@
         }
 
         .feature-card:hover,
-        .cta-button:hover {
+        .cta-button-outline:hover {
           transform: none;
         }
       }
@@ -525,7 +552,7 @@
         When employees can't make it to work, they text the AI assistant instead
         of the manager. AI handles the conversation &amp; reporting.
       </p>
-      <a href="/login" class="cta-button">Get Started</a>
+      <a href="/contact" class="cta-button-outline">Talk to us</a>
     </section>
 
     <section class="demo">
@@ -606,6 +633,12 @@
           </p>
         </div>
       </div>
+    </section>
+
+    <section class="cta-section">
+      <h2>Ready to automate your call-ins?</h2>
+      <p>Let's talk about how this would fit with your team.</p>
+      <a href="/contact" class="cta-button-outline">Connect with us</a>
     </section>
 
     <footer class="footer">

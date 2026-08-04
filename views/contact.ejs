@@ -1,0 +1,363 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Contact Us - AI Attendance</title>
+    <link rel="stylesheet" href="/css/style.css" />
+    <style>
+      :root {
+        --background: #000f0d;
+        --text-primary: #f6f7f6;
+        --text-secondary: #b6bbb7;
+        --border: rgba(246, 247, 246, 0.22);
+        --border-strong: rgba(246, 247, 246, 0.9);
+        --surface: rgba(246, 247, 246, 0.04);
+        --surface-raised: rgba(246, 247, 246, 0.07);
+      }
+
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      html {
+        height: 100%;
+        overflow-x: hidden;
+      }
+
+      /* Only 400/500/600/700 are shipped - never exceed 700. */
+      body {
+        font-family:
+          "Inter",
+          -apple-system,
+          BlinkMacSystemFont,
+          "Segoe UI",
+          Roboto,
+          "Helvetica Neue",
+          Arial,
+          sans-serif;
+        line-height: 1.6;
+        color: var(--text-primary);
+        background: var(--background);
+        min-height: 100%;
+        margin: 0;
+        overflow-x: hidden;
+        width: 100%;
+        -webkit-font-smoothing: antialiased;
+        -moz-osx-font-smoothing: grayscale;
+      }
+
+      .contact-page {
+        min-height: 100vh;
+        display: flex;
+        flex-direction: column;
+        width: 100%;
+        overflow-x: hidden;
+      }
+
+      /* Navigation */
+      .navbar {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 1rem 5%;
+        background: var(--background);
+        border-bottom: 1px solid var(--border);
+        position: sticky;
+        top: 0;
+        z-index: 100;
+        flex-shrink: 0;
+      }
+
+      .logo {
+        font-size: 1.5rem;
+        font-weight: 700;
+        color: var(--text-primary);
+        letter-spacing: -0.02em;
+        text-decoration: none;
+      }
+
+      .nav-links a {
+        color: var(--text-primary);
+        text-decoration: none;
+        padding: 0.625rem 1.5rem;
+        border-radius: 6px;
+        font-weight: 500;
+        transition: all 0.2s;
+        border: 1px solid var(--border-strong);
+        display: inline-block;
+      }
+
+      .nav-links a:hover {
+        background: var(--text-primary);
+        color: var(--background);
+      }
+
+      /* Two column layout: pitch on the left, form on the right */
+      .contact-main {
+        flex: 1;
+        padding: 4rem 5% 5rem;
+      }
+
+      .contact-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 4rem;
+        max-width: 1100px;
+        margin: 0 auto;
+        align-items: start;
+      }
+
+      .contact-intro .eyebrow {
+        font-size: 0.8125rem;
+        font-weight: 500;
+        text-transform: uppercase;
+        letter-spacing: 0.14em;
+        color: var(--text-secondary);
+        margin-bottom: 1.25rem;
+      }
+
+      .contact-intro h1 {
+        font-size: clamp(1.875rem, 4vw, 2.5rem);
+        font-weight: 700;
+        line-height: 1.2;
+        letter-spacing: -0.03em;
+        margin-bottom: 1.25rem;
+        color: var(--text-primary);
+      }
+
+      .contact-intro > p {
+        color: var(--text-secondary);
+        font-size: 1.0625rem;
+        line-height: 1.7;
+        margin-bottom: 2rem;
+      }
+
+      .expect-title {
+        font-size: 0.9375rem;
+        font-weight: 600;
+        color: var(--text-primary);
+        margin-bottom: 1rem;
+      }
+
+      .expect-list {
+        list-style: none;
+        padding: 0;
+        margin: 0;
+      }
+
+      .expect-list li {
+        position: relative;
+        padding-left: 1.75rem;
+        margin-bottom: 0.875rem;
+        color: var(--text-secondary);
+        line-height: 1.7;
+      }
+
+      .expect-list li::before {
+        content: "";
+        position: absolute;
+        left: 0;
+        top: 0.7em;
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: #4ade80;
+      }
+
+      /* Form panel - deliberately WHITE, not the dark surface used elsewhere.
+         The HubSpot form is a cross-origin iframe (verified: 0 inputs reachable
+         from page CSS), and its default label/help text is dark. On a dark
+         panel that text was unreadable. On white it reads correctly with zero
+         HubSpot-side configuration. */
+      .form-panel {
+        background: #f6f7f6;
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        padding: 2rem;
+      }
+
+      .form-panel-title {
+        font-size: 1rem;
+        font-weight: 600;
+        color: #000f0d;
+        margin-bottom: 1.5rem;
+        padding-bottom: 1.25rem;
+        border-bottom: 1px solid rgba(0, 15, 13, 0.14);
+      }
+
+      /* ------------------------------------------------------------------
+         NOTE: the HubSpot form renders inside a CROSS-ORIGIN IFRAME.
+         Verified in-browser: 0 form inputs are reachable from this page, for
+         BOTH the new (.hs-form-frame) and legacy (hbspt.forms.create) embeds.
+         No CSS written here can style the form's interior - that is a browser
+         security boundary, not a selector problem. The white .form-panel
+         background above is what makes HubSpot's default (dark-text) styling
+         legible without touching HubSpot's own editor.
+         ------------------------------------------------------------------ */
+
+      /* The iframe itself IS ours to size. */
+      .hs-form-frame iframe {
+        width: 100% !important;
+        border: 0;
+      }
+
+      /* Fallback while the embed script loads or if it is blocked.
+         Dark text - it sits on the white .form-panel, not the dark page. */
+      .form-fallback {
+        color: rgba(0, 15, 13, 0.7);
+        font-size: 0.9375rem;
+        line-height: 1.7;
+      }
+
+      .form-fallback a {
+        color: #000f0d;
+        font-weight: 600;
+      }
+
+      /* Footer */
+      .footer {
+        text-align: center;
+        padding: 2rem 5%;
+        border-top: 1px solid var(--border);
+        flex-shrink: 0;
+      }
+
+      .footer p {
+        margin: 0;
+        color: var(--text-secondary);
+        font-size: 0.875rem;
+      }
+
+      /* Mobile */
+      @media (max-width: 900px) {
+        .contact-grid {
+          grid-template-columns: 1fr;
+          gap: 2.5rem;
+        }
+      }
+
+      @media (max-width: 768px) {
+        .navbar {
+          padding: 1rem 4%;
+        }
+
+        .logo {
+          font-size: 1.25rem;
+        }
+
+        .nav-links a {
+          padding: 0.5rem 1.25rem;
+          font-size: 0.9375rem;
+        }
+
+        .contact-main {
+          padding: 3rem 4% 3.5rem;
+        }
+
+        .form-panel {
+          padding: 1.5rem;
+        }
+
+        .footer {
+          padding: 1.75rem 4%;
+        }
+      }
+
+      @media (max-width: 480px) {
+        .navbar {
+          padding: 0.875rem 5%;
+        }
+
+        .logo {
+          font-size: 1.125rem;
+        }
+
+        .nav-links a {
+          padding: 0.5rem 1rem;
+          font-size: 0.875rem;
+        }
+
+        .contact-main {
+          padding: 2.5rem 5% 3rem;
+        }
+
+        .form-panel {
+          padding: 1.25rem 1rem;
+        }
+
+        .footer {
+          padding: 1.5rem 5%;
+        }
+      }
+
+      @media (hover: none) and (pointer: coarse) {
+        .nav-links a {
+          min-height: 44px;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+        }
+
+      }
+    </style>
+  </head>
+  <body class="contact-page">
+    <nav class="navbar">
+      <a href="/" class="logo">AI Attendance</a>
+      <div class="nav-links">
+        <a href="/login">Login</a>
+      </div>
+    </nav>
+
+    <main class="contact-main">
+      <div class="contact-grid">
+        <div class="contact-intro">
+          <p class="eyebrow">Get in touch</p>
+          <h1>👋 We're excited to connect</h1>
+          <p>
+            Tell us a bit about your team and we'll get back to you shortly.
+          </p>
+
+          <p class="expect-title">Here's what you can expect:</p>
+          <ul class="expect-list">
+            <li>See how the AI handles your team's real messages.</li>
+            <li>Talk through a pilot on a single shift or department.</li>
+            <li>Get any other questions answered.</li>
+          </ul>
+        </div>
+
+        <div class="form-panel">
+          <p class="form-panel-title">
+            Complete this form &amp; we'll get back to you soon.
+          </p>
+
+          <!-- HubSpot replaces the contents of this div with the form -->
+          <div
+            class="hs-form-frame"
+            data-region="na1"
+            data-form-id="ba557a60-0351-4dcc-ae7c-42291ec2a321"
+            data-portal-id="46277076"
+          >
+            <p class="form-fallback">
+              Loading the form… if it doesn't appear, email us at
+              <a href="mailto:hello@example.com">hello@example.com</a>.
+            </p>
+          </div>
+        </div>
+      </div>
+    </main>
+
+    <footer class="footer">
+      <p>&copy; <%= new Date().getFullYear() %> AI Attendance.</p>
+    </footer>
+
+    <!--
+      HubSpot embed (portal 46277076). The script scans for .hs-form-frame divs
+      and renders the form identified by their data- attributes.
+    -->
+    <script src="https://js.hsforms.net/forms/embed/46277076.js" defer></script>
+  </body>
+</html>

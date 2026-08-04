@@ -106,6 +106,12 @@ app.get('/', (req, res) => {
   }
 });
 
+// Public contact page (target of both landing-page CTAs).
+// Renders for signed-in users too - it is a marketing page, not gated.
+app.get('/contact', (req, res) => {
+  res.render('contact');
+});
+
 // 404 handler
 app.use((req, res) => {
   res.status(404).render('error', {
