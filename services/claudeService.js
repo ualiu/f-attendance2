@@ -63,11 +63,9 @@ Review this employee's attendance. Be direct and concise - no fluff.
 ${employee.name} (${employee.employee_id})
 Shift: ${employee.shift}
 Started: ${employee.start_date ? new Date(employee.start_date).toLocaleDateString() : 'Unknown'}
-Benefits: ${employee.vacation_days_per_year || 0} vacation, ${employee.sick_days_per_year || 0} sick, ${employee.flex_days_per_year || 0} flex days
-Points: ${employee.points_current_quarter}/6.0 - Status: ${employee.status}
 
-**ABSENCES (${absences.length} this quarter):**
-${absences.map(a => `${a.date.toLocaleDateString()}: ${a.type} - ${a.reason} (${a.points_awarded} pts)`).join('\n')}
+**ABSENCES (${absences.length} in this period):**
+${absences.map(a => `${a.date.toLocaleDateString()}: ${a.type} - ${a.reason}`).join('\n')}
 
 **WHAT I NEED:**
 
@@ -78,7 +76,6 @@ ${absences.map(a => `${a.date.toLocaleDateString()}: ${a.type} - ${a.reason} (${
    - Skip this if no real patterns
 
 3. Risk level: Low, Medium, or High
-   - Will they hit 6 points soon?
    - Any red flags?
 
 4. What to do next:

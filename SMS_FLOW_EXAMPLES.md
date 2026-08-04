@@ -1,177 +1,183 @@
 # SMS Conversation Flow - Examples
 
-## New System Overview
+Every conversation below is real output captured from `scripts/test-sms-conversation.js`
+running against the live parser. Run `npm run test:sms` to reproduce them.
 
-**Duration-Based Classification:**
-- **< 2 hours** → LATE (0.33 points)
-- **2-4 hours** → HALF DAY (0.5 points)
-- **4+ hours** → FULL DAY (1.0 points)
+> **There is no points system.** If you find a doc, comment or prompt mentioning points,
+> statuses or quarterly thresholds, it is stale. See CLAUDE.md.
 
-**Key Improvements:**
-✅ Natural conversation (no "how many minutes?")
-✅ Understands duration from context ("3 hours", "half day")
-✅ Accepts any specific reason (groceries, traffic, flu)
-✅ Won't get stuck in loops
-✅ Always asks for missing info conversationally
+## How classification works
 
----
+Duration decides the absence type (`classifyAbsenceByDuration` in `services/smsService.js`):
 
-## Scenario 1: Employee says "I will be late this morning"
+| Duration  | Type            |
+| --------- | --------------- |
+| < 2 hours | `short_absence` |
+| 2-4 hours | `half_day`      |
+| 4+ hours  | `full_day`      |
 
-**Conversation:**
-```
-Employee: I will be late this morning
-System: Hi Bob, how late will you be? (e.g., "30 min", "2 hours")
+`late` is an arrival delay at shift start and is never reclassified by duration. These map
+onto the three SMS database types (`sick`, `late`, `personal`) via `subtype`.
 
-Employee: 30 minutes
-System: Hi Bob, why are you running late? (e.g., traffic, car trouble, appointment)
+## The core rule: ask, don't assume
 
-Employee: Traffic
-System: Got it, Bob. Logged as late (30 min). +0.33 points. Total: 2.33 points. ✅ Good standing.
-```
+Attendance records feed discipline, so an extra text is cheaper than a wrong record. The
+system infers a duration only when the message states **total absence**, and asks otherwise.
+The distinction is scope, not condition:
 
-**Result:** Late (30 min - Traffic), 0.33 points
+- "can't come in" / "out today" / "taking the day" → states total absence → **infers** full day
+- "I'm sick" / "I have an appointment" / "be there soon" → states a condition → **asks**
 
----
-
-## Scenario 2: User's problematic example - "3 hours. Need to do groceries."
-
-**Conversation:**
-```
-Employee: I will be late this morning
-System: Hi Bob, how late will you be? (e.g., "30 min", "2 hours")
-
-Employee: 3 hours. Need to do groceries.
-System: Got it, Bob. Logged as personal (half day) (3 hours). +0.5 points. Total: 2.5 points. ✅ Good standing.
-```
-
-**Result:** Personal half day (3 hours - Groceries), 0.5 points
-**Why it works:** System recognizes 3 hours = half day, extracts "groceries" as reason
+Vague durations are never converted into numbers. "a while", "soon" and "a bit" produce a
+question, not a guess.
 
 ---
 
-## Scenario 3: Complete information upfront
+## Scenario 1: Full day, reported the night before
 
-**Conversation:**
 ```
-Employee: Running 30 min late - traffic
-System: Got it, Bob. Logged as late (30 min). +0.33 points. Total: 1.33 points. ✅ Good standing.
+Employee: I can't come in tomorrow
+System:   Hi John Doe, what's the reason? (e.g., appointment, errands, family matter)
+
+Employee: I have an appointment
+System:   Got it, John Doe. Logged: out all day (personal) tomorrow - Appointment. ✅
+          If that's not right, just reply and tell me what to change.
 ```
 
-**Result:** Late (30 min - Traffic), 0.33 points
-**Why it works:** All info provided, no follow-up needed
+**Result:** `full_day` / `personal` / 480 min, dated **tomorrow**
+
+"I can't come in" states total absence, so duration is inferred and never asked for.
+Answering "the reason" does not reclassify the absence — an appointment is *why* they are
+missing the whole day, not evidence they are merely running late.
 
 ---
 
-## Scenario 4: Sick with details
+## Scenario 2: A condition with no scope
 
-**Conversation:**
 ```
-Employee: I'm sick with the flu
-System: Got it, Bob. Logged as sick. +1.0 point. Total: 3.0 points. ⚠️ WATCH - Please be mindful of attendance.
+Employee: I'm sick
+System:   Hi John Doe, how long will you be out? (e.g., "an hour", "few hours", "all day")
+
+Employee: all day
+System:   Got it, John Doe. Logged: out all day (sick) today - Sick. ✅
+          If that's not right, just reply and tell me what to change.
 ```
 
-**Result:** Sick full day (Flu), 1.0 points
-**Why it works:** "Sick" implies full day, reason provided
+**Result:** `full_day` / `sick` / 480 min / today
+
+Being sick does not say how much work is missed — they might come in late or leave early.
+The system asks rather than assuming a full day.
 
 ---
 
-## Scenario 5: Mid-day appointment (no duration specified)
+## Scenario 3: Ordinary lateness
 
-**Conversation:**
 ```
-Employee: Need to step out for a doctor appointment
-System: Hi Bob, how long will you be out? (e.g., "few hours", "half day", "all day")
+Employee: running late
+System:   Hi John Doe, how late will you be? (e.g., "30 min", "2 hours")
 
-Employee: Couple hours
-System: Got it, Bob. Logged as personal (half day) (2 hours). +0.5 points. Total: 1.5 points. ✅ Good standing.
+Employee: 45 min
+System:   Hi John Doe, why are you running late? (e.g., traffic, car trouble, appointment)
+
+Employee: traffic
+System:   Got it, John Doe. Logged: in 45 min late today - Traffic. ✅
 ```
 
-**Result:** Personal half day (2 hours - Doctor appointment), 0.5 points
-**Why it works:** Reason extracted, asked for duration, understood "couple hours"
+**Result:** `late` / 45 min / today
 
 ---
 
-## Scenario 6: Vague initial message
+## Scenario 4: Everything in one message
 
-**Conversation:**
 ```
-Employee: Can't come in
-System: Hi Bob, are you running late, calling out sick, or taking time off today?
-
-Employee: Sick
-System: Hi Bob, what's going on? (e.g., flu, headache, doctor visit)
-
-Employee: Flu and fever
-System: Got it, Bob. Logged as sick. +1.0 point. Total: 2.0 points. ✅ Good standing.
+Employee: Out sick with flu today
+System:   Got it, John Doe. Logged: out all day (sick) today - Flu. ✅
 ```
 
-**Result:** Sick full day (Flu and fever), 1.0 points
-**Why it works:** Step-by-step clarification, natural questions
+**Result:** `full_day` / `sick` — resolved in a single turn, no questions asked.
 
 ---
 
-## Scenario 7: Extended late (becomes half day)
+## Scenario 5: Mid-day absence
 
-**Conversation:**
 ```
-Employee: Running late - car broke down
-System: Hi Bob, how late will you be? (e.g., "30 min", "2 hours")
+Employee: need to step out for dentist
+System:   Hi John Doe, how long will you be out? (e.g., "an hour", "few hours", "all day")
 
-Employee: Probably 3 hours
-System: Got it, Bob. Logged as personal (half day) (3 hours). +0.5 points. Total: 1.5 points. ✅ Good standing.
+Employee: 3 hours
+System:   Got it, John Doe. Logged: out 3 hours (personal) today - Dentist appointment. ✅
 ```
 
-**Result:** Personal half day (3 hours - Car broke down), 0.5 points
-**Why it works:** System auto-classifies 3 hours as half day instead of tardiness
+**Result:** `half_day` / `personal` / 180 min
+
+Note the wording: a mid-day absence is asked **"how long will you be out?"**, never "how
+late will you be?" — that phrasing is reserved for arrival delays.
 
 ---
 
-## Scenario 8: Natural language duration
+## Scenario 6: Under two hours
 
-**Conversation:**
 ```
-Employee: Late - overslept
-System: Hi Bob, how late will you be? (e.g., "30 min", "2 hours")
+Employee: I'll be away for an appointment
+System:   Hi John Doe, how long will you be out? (e.g., "an hour", "few hours", "all day")
 
-Employee: Half hour
-System: Got it, Bob. Logged as late (30 min). +0.33 points. Total: 1.33 points. ✅ Good standing.
+Employee: 1 hour
+System:   Got it, John Doe. Logged: out 1 hour (personal) today - Appointment. ✅
 ```
 
-**Result:** Late (30 min - Overslept), 0.33 points
-**Why it works:** Understands "half hour" = 30 minutes
+**Result:** `short_absence` — 60 minutes is under the 2-hour threshold.
 
 ---
 
-## Key Differences from Old System
+## Scenario 7: The employee corrects us
 
-### ❌ Old System Issues:
-- Asked "how many minutes?" (too granular)
-- Got stuck in loops asking same question
-- Didn't understand "3 hours" as a valid response
-- No concept of half-day
-- Too picky about reasons
+```
+Employee: I'll be 30 min late
+System:   Hi John Doe, why are you running late? (e.g., traffic, car trouble, appointment)
 
-### ✅ New System Fixes:
-- Asks "how late?" (conversational)
-- Recognizes when info is already provided
-- Understands natural duration ("3 hours", "couple hours", "half day")
-- Half-day classification (2-4 hours = 0.5 points)
-- Accepts any specific reason mentioned
-- Never gets stuck - moves forward with conversation
+Employee: actually I can't come in at all today, family emergency
+System:   Got it, John Doe. Logged: out all day (personal) today - Family emergency. ✅
+```
+
+**Result:** `full_day` — the stored `late` / 30 min is overwritten.
+
+"actually" and "at all" signal a correction, which is the only thing allowed to reclassify
+an absence mid-conversation. A correction sent *after* the record is saved deletes it and
+starts over — the confirmation message invites exactly that.
 
 ---
 
-## Points System Summary
+## Scenario 8: Vague duration
 
-| Duration | Classification | Points | Examples |
-|----------|---------------|--------|----------|
-| < 2 hours | Late/Tardy | 0.33 | "30 min late", "1 hour late" |
-| 2-4 hours | Half Day | 0.5 | "3 hours", "half day", "couple hours" |
-| 4+ hours / All day | Full Day | 1.0 | "All day", "not coming in", "sick" |
+```
+Employee: be there soon, traffic
+System:   Hi John Doe, how late will you be? (e.g., "30 min", "2 hours")
+```
 
-**Employee Status Levels:**
-- 0-2.99 points: ✅ Good standing
-- 3-3.99 points: ⚠️ WATCH
-- 4-5.99 points: ⚠️ AT RISK
-- 6+ points: ⚠️ FORMAL REVIEW REQUIRED
+"Soon" is not a duration. It is never turned into 15 minutes — the system asks.
+
+---
+
+## Scenario 9: A future weekday
+
+```
+Employee: I won't be in Monday
+System:   Hi John Doe, what's the reason? (e.g., appointment, errands, family matter)
+
+Employee: family matter
+System:   Got it, John Doe. Logged: out all day (personal) Monday - Family matter. ✅
+```
+
+**Result:** dated the **next** Monday, resolved to UTC midnight by `resolveAbsenceDate`.
+
+---
+
+## Conversation lifecycle
+
+- State lives in `ConversationState`, keyed by phone number, with a 15-minute TTL.
+- Established facts are sticky: an ambiguous or empty value can never overwrite a concrete
+  one. Only a concrete value, or an explicit correction, can.
+- After an absence is logged the conversation stays open for the rest of the TTL so a reply
+  can correct the record. An unrelated new message starts a fresh conversation.
+- If the same question would be asked twice, the reply is prefixed with "Sorry, I didn't
+  catch that"; after several failed turns it hands off to the phone number.

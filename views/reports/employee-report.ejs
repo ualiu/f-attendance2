@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title><%= title %> - Felton Brushes</title>
+  <title><%= title %> - <%= organization ? organization.name : 'AI Attendance' %></title>
   <link rel="stylesheet" href="/css/style.css">
 </head>
 <body>
@@ -21,15 +21,9 @@
       <h2>Employee Information</h2>
       <div class="info-grid">
         <div><strong>Employee ID:</strong> <%= report.employee.employee_id %></div>
-        <div><strong>Department:</strong> <%= report.employee.department %></div>
-        <div><strong>Work Station:</strong> <%= report.employee.work_station || 'Not assigned' %></div>
         <div><strong>Shift:</strong> <%= report.employee.shift %></div>
-        <div><strong>Current Points:</strong> <%= report.employee.points_current_quarter %> / 6.0</div>
-        <div><strong>Status:</strong>
-          <span class="status-badge status-<%= report.employee.status %>">
-            <%= report.employee.status.replace('_', ' ') %>
-          </span>
-        </div>
+        <div><strong>Phone:</strong> <%= report.employee.phone %></div>
+        <div><strong>Start Date:</strong> <%= report.employee.start_date ? new Date(report.employee.start_date).toLocaleDateString() : 'Not set' %></div>
       </div>
     </div>
 
@@ -41,7 +35,6 @@
           <li>
             <%= new Date(absence.date).toLocaleDateString() %>:
             <%= absence.type %> - <%= absence.reason %>
-            (<%= absence.points_awarded %> points)
           </li>
         <% }); %>
       </ul>

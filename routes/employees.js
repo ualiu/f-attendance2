@@ -75,11 +75,7 @@ router.post('/', async (req, res) => {
       phone,
       shift,
       supervisor_id,
-      organization_id: req.organizationId, // CRITICAL: Assign to user's organization
-      points_current_quarter: 0,
-      absences_this_quarter: 0,
-      tardies_this_quarter: 0,
-      status: 'good'
+      organization_id: req.organizationId // CRITICAL: Assign to user's organization
     });
 
     res.json({ success: true, employee });
@@ -93,11 +89,6 @@ router.put('/:id', async (req, res) => {
   try {
     const updates = req.body;
 
-    // Don't allow updating points/status directly (use attendance service)
-    delete updates.points_current_quarter;
-    delete updates.absences_this_quarter;
-    delete updates.tardies_this_quarter;
-    delete updates.status;
     delete updates.organization_id; // Prevent changing organization
 
     const employee = await Employee.findOneAndUpdate(
@@ -162,28 +153,6 @@ router.get('/:id/absences', async (req, res) => {
   }
 });
 
-// Reset employee points (for new quarter) - tenant-scoped
-router.post('/:id/reset-points', async (req, res) => {
-  try {
-    const employee = await validateTenantAccess(Employee, req.params.id, req.organizationId);
-
-    if (!employee) {
-      return res.status(404).json({ success: false, error: 'Employee not found' });
-    }
-
-    employee.points_current_quarter = 0;
-    employee.absences_this_quarter = 0;
-    employee.tardies_this_quarter = 0;
-    employee.status = 'good';
-
-    await employee.save();
-
-    res.json({ success: true, employee });
-  } catch (error) {
-    res.status(500).json({ success: false, error: error.message });
-  }
-});
-
 // Bulk import employees (tenant-scoped)
 router.post('/bulk-import', async (req, res) => {
   try {
@@ -201,11 +170,7 @@ router.post('/bulk-import', async (req, res) => {
     const employeesWithOrgAndSupervisor = employees.map(emp => ({
       ...emp,
       supervisor_id,
-      organization_id, // CRITICAL: Assign to user's organization
-      points_current_quarter: 0,
-      absences_this_quarter: 0,
-      tardies_this_quarter: 0,
-      status: 'good'
+      organization_id // CRITICAL: Assign to user's organization
     }));
 
     const created = await Employee.insertMany(employeesWithOrgAndSupervisor);
