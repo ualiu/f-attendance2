@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>godspec.ai - AI-Powered Attendance Management</title>
+    <title>StaffLogix - AI-Powered Attendance Management</title>
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
     <link rel="stylesheet" href="/css/style.css" />
     <style>
@@ -483,10 +483,22 @@
       .features h2 {
         text-align: center;
         font-size: clamp(1.75rem, 4vw, 2.25rem);
-        margin-bottom: 3rem;
+        margin-bottom: 0.75rem;
         color: var(--text-primary);
         font-weight: 600;
         letter-spacing: -0.02em;
+      }
+
+      /* Supporting line under the section heading. It takes over the 3rem gap
+         the h2 used to own, so the distance down to the cards is unchanged;
+         h2 keeps the same tight 0.75rem to its subhead as .cta-section does. */
+      .features-subhead {
+        text-align: center;
+        color: var(--text-secondary);
+        max-width: 520px;
+        margin: 0 auto 3rem;
+        font-size: 1rem;
+        line-height: 1.7;
       }
 
       .features-grid {
@@ -635,6 +647,10 @@
         }
 
         .features h2 {
+          margin-bottom: 0.75rem;
+        }
+
+        .features-subhead {
           margin-bottom: 2rem;
         }
 
@@ -801,7 +817,7 @@
   </head>
   <body class="landing-page">
     <nav class="navbar">
-      <div class="logo">godspec.ai</div>
+      <div class="logo">StaffLogix</div>
       <div class="nav-links">
         <a href="/login">Login</a>
       </div>
@@ -812,7 +828,7 @@
       <h1>Automate employee call-ins & shift coverage with SMS</h1>
       <p>
         AI assistant handles employee call-ins, finds coworkers to cover open
-        shifts, and keeps managers in control. <br />All via SMS.
+        shifts, and keeps managers in control.
       </p>
       <a href="/contact" class="cta-button-outline">Talk to us</a>
     </section>
@@ -987,6 +1003,9 @@
 
     <section class="features">
       <h2>How It Works</h2>
+      <p class="features-subhead">
+        No app to download. All handled via SMS.
+      </p>
       <div class="features-grid">
         <div class="feature-card">
           <div class="feature-step">01 &middot; Employee texts</div>
@@ -1024,7 +1043,7 @@
     </section>
 
     <footer class="footer">
-      <p>&copy; <%= new Date().getFullYear() %> godspec.ai.</p>
+      <p>&copy; <%= new Date().getFullYear() %> StaffLogix.</p>
     </footer>
 
     <script>

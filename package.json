@@ -1,5 +1,5 @@
 {
-  "name": "godspec.ai",
+  "name": "stafflogix",
   "version": "1.0.0",
   "description": "AI-powered attendance and shift-coverage system",
   "main": "server.js",

@@ -60,7 +60,7 @@ Before marking as dead, verify it's not used dynamically:
 4. **EJS Templates** - Search `/views/*.ejs` for function calls
 5. **Scripts** - Check `/scripts/*.js` for imports
 
-## Project-Specific (godspec.ai)
+## Project-Specific (StaffLogix)
 
 ### Key Entry Points
 - `server.js` - Main app, mounts all routes

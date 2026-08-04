@@ -110,7 +110,7 @@ What problems share similar characteristics?
 [Thought-provoking questions for the user]
 ```
 
-## Current System Capabilities (godspec.ai)
+## Current System Capabilities (StaffLogix)
 
 Based on the codebase:
 

@@ -198,7 +198,7 @@ function validateEmail(email) {
 }
 
 // Export for use in other scripts
-window.GodspecAI = {
+window.StaffLogix = {
   refreshDashboardData,
   viewMessage,
   viewTranscript,
