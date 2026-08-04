@@ -5,6 +5,7 @@ const Employee = require('../models/Employee');
 const Absence = require('../models/Absence');
 const Organization = require('../models/Organization');
 const smsService = require('../services/smsService');
+const coverageService = require('../services/coverageService');
 
 // Twilio webhook for incoming SMS
 router.post('/incoming', async (req, res) => {
@@ -24,6 +25,29 @@ router.post('/incoming', async (req, res) => {
     // Try to find employee - search for the last 10 digits
     const last10Digits = normalizedPhone.slice(-10);
     console.log('   Searching for last 10 digits:', last10Digits);
+
+    // ── Shift coverage: manager approval reply ──────────────────────────────
+    // Checked BEFORE the employee lookup: the manager is a Supervisor, whose
+    // phone could coincidentally collide with an employee's. A pending
+    // manager-approval reply is unambiguous and must never fall into the
+    // absence flow below.
+    try {
+      const mgrOffer = await coverageService.findOfferAwaitingManager(last10Digits);
+      if (mgrOffer) {
+        console.log('   📌 Manager approval reply for offer', String(mgrOffer._id));
+        const mgrOrg = await Organization.findById(mgrOffer.organization_id);
+        const mgrProvider = mgrOrg?.settings?.llm_provider || 'claude';
+        const { reply } = await coverageService.handleManagerReply({
+          offer: mgrOffer, messageBody, provider: mgrProvider
+        });
+        const twiml = new twilio.twiml.MessagingResponse();
+        twiml.message(reply);
+        res.type('text/xml');
+        return res.send(twiml.toString());
+      }
+    } catch (err) {
+      console.error('❌ Error in coverage manager-reply routing (falling through to normal flow):', err);
+    }
 
     const employee = await Employee.findOne({
       phone: { $regex: last10Digits }
@@ -73,6 +97,35 @@ router.post('/incoming', async (req, res) => {
       console.log('   💬 Conversation state:', JSON.stringify(conversationState.collected_info, null, 2));
     }
 
+    // ── Shift coverage: candidate offer reply ───────────────────────────────
+    // Skipped while an absence conversation has a pending question - that
+    // "yes" is answering OUR question (e.g. "is this a sick day or a
+    // personal day?"), not an offer. See coverageService.js handleCandidateReply.
+    try {
+      const midQuestion = conversationState
+        && conversationState.status === 'collecting'
+        && conversationState.last_question_asked;
+
+      if (!midQuestion) {
+        const candOffer = await coverageService.findOfferForCandidatePhone(last10Digits);
+        if (candOffer) {
+          console.log('   📌 Candidate offer reply for offer', String(candOffer._id));
+          const { handled, reply } = await coverageService.handleCandidateReply({
+            offer: candOffer, phoneLast10: last10Digits, messageBody, provider: llmProvider
+          });
+          if (handled) {
+            const twiml = new twilio.twiml.MessagingResponse();
+            twiml.message(reply);
+            res.type('text/xml');
+            return res.send(twiml.toString());
+          }
+          console.log('   🆕 Reply looked like an absence report - falling through to absence flow');
+        }
+      }
+    } catch (err) {
+      console.error('❌ Error in coverage candidate-reply routing (falling through to normal flow):', err);
+    }
+
     // If we already logged an absence in this window, this message may be the
     // employee correcting it (we invited them to). Remember which record so we
     // can undo it if so.
@@ -117,6 +170,10 @@ router.post('/incoming', async (req, res) => {
     if (priorLoggedAbsenceId) {
       if (parsedData.is_correction) {
         await smsService.undoLoggedAbsence(priorLoggedAbsenceId, employee._id);
+        // Fire-and-forget: a corrected/undone absence no longer needs coverage.
+        // Never let a coverage-side failure affect the correction itself.
+        coverageService.cancelOfferForAbsence(priorLoggedAbsenceId, 'absence_corrected')
+          .catch(err => console.error('❌ Coverage offer cancel failed (absence still corrected):', err));
         conversationState = await smsService.reopenConversationForCorrection(phoneNumber);
       } else {
         console.log('   🆕 Not a correction - starting a fresh conversation');
@@ -192,6 +249,16 @@ router.post('/incoming', async (req, res) => {
     });
 
     console.log('   ✅ Absence logged:', absence._id);
+
+    // Shift coverage: only for full-day call-ins (lates and short/half-day
+    // absences are unaffected, per design - "we don't care about lates").
+    // Fire-and-forget: coverage must never delay or break the SMS confirmation,
+    // and a coverage failure must never un-log an absence that was already
+    // successfully recorded.
+    if (parsedData.type === 'full_day') {
+      coverageService.startCoverage({ absence, employee, organization, trigger: 'sms_auto' })
+        .catch(err => console.error('❌ Coverage start failed (absence still logged):', err));
+    }
 
     // Keep the conversation alive instead of clearing it, so the employee can
     // reply to correct the record (the confirmation invites them to). It still

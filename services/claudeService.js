@@ -13,10 +13,10 @@ const openai = new OpenAI({
 });
 
 // Call the configured LLM provider and return the raw text response
-async function callLLM(prompt, { provider = 'claude', maxTokens = 2000 } = {}) {
+async function callLLM(prompt, { provider = 'claude', maxTokens = 2000, model = null } = {}) {
   if (provider === 'openai') {
     const completion = await openai.chat.completions.create({
-      model: process.env.OPENAI_MODEL || 'gpt-4o',
+      model: model || process.env.OPENAI_MODEL || 'gpt-4o',
       max_tokens: maxTokens,
       messages: [{ role: 'user', content: prompt }]
     });
@@ -24,7 +24,7 @@ async function callLLM(prompt, { provider = 'claude', maxTokens = 2000 } = {}) {
   }
 
   const message = await anthropic.messages.create({
-    model: 'claude-opus-4-5-20251101',
+    model: model || process.env.ANTHROPIC_MODEL || 'claude-opus-4-5-20251101',
     max_tokens: maxTokens,
     messages: [{ role: 'user', content: prompt }]
   });

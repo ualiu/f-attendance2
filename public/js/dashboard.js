@@ -34,13 +34,13 @@ async function refreshDashboardData() {
 function updateDashboard(data) {
   if (!data.success) return;
 
-  // Update stats cards
+  // Update stats cards (Total / Present / Absent - the dashboard no longer
+  // tracks a separate Late count, see attendanceService.getTodaysSummary)
   const statsCards = document.querySelectorAll('.stat-value');
-  if (statsCards.length >= 4) {
+  if (statsCards.length >= 3) {
     statsCards[0].textContent = data.todaysSummary.totalEmployees || 0;
     statsCards[1].textContent = data.todaysSummary.presentCount || 0;
     statsCards[2].textContent = data.todaysSummary.absentCount || 0;
-    statsCards[3].textContent = data.todaysSummary.lateCount || 0;
   }
 
   // Update recent absences table if data is available

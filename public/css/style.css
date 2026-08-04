@@ -719,7 +719,11 @@ a:hover {
   }
 
   .stats-grid {
-    grid-template-columns: repeat(4, 1fr);
+    /* auto-fit (not a hardcoded column count) so this stays correct
+       regardless of how many stat cards a given page renders - the
+       dashboard has 3 (Total/Present/Absent), reports overrides this
+       inline with its own count via minmax(250px, 1fr). */
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
   }
 
   .dashboard-header h1 {

@@ -22,6 +22,15 @@ const employeeSchema = new mongoose.Schema({
     required: true
   },
 
+  // Used for shift-coverage candidate matching: offers go to every other
+  // employee in the same department. Free text (not an enum) because it's
+  // sourced from Organization.settings.departments, which admins manage.
+  department: {
+    type: String,
+    default: null,
+    trim: true
+  },
+
   // Employee details
   start_date: {
     type: Date,

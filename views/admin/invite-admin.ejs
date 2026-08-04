@@ -27,6 +27,7 @@
             <th>Name</th>
             <th>Email</th>
             <th>Role</th>
+            <th>Phone</th>
             <th>Status</th>
             <th>Actions</th>
           </tr>
@@ -34,7 +35,7 @@
         <tbody>
           <% if (!admins || admins.length === 0) { %>
             <tr>
-              <td colspan="5" class="no-data">No admins found</td>
+              <td colspan="6" class="no-data">No admins found</td>
             </tr>
           <% } else { %>
             <% admins.forEach(admin => { %>
@@ -49,6 +50,14 @@
                   <% } else { %>
                     <%= admin.role %>
                   <% } %>
+                </td>
+                <td>
+                  <span id="adminPhoneDisplay-<%= admin._id %>">
+                    <%= admin.phone || '—' %>
+                  </span>
+                  <button type="button" onclick="editAdminPhone('<%= admin._id %>', '<%= admin.phone || '' %>')" class="btn-small" style="margin-left: 0.5rem;">
+                    <%= admin.phone ? 'Edit' : 'Set phone' %>
+                  </button>
                 </td>
                 <td>
                   <% if (admin.is_active) { %>
@@ -97,6 +106,33 @@
       </div>
 
       <div id="llmProviderStatusMessage" style="margin-top: 1rem; padding: 0.75rem; border-radius: 6px; display: none;"></div>
+    </div>
+
+    <!-- Departments Section -->
+    <div class="card" style="margin-bottom: 1.5rem;">
+      <h2 style="font-size: 1.125rem;">Departments</h2>
+      <p style="color: #6b7280; margin-bottom: 1rem; font-size: 0.875rem;">
+        Used to match employees for shift coverage - when someone can't make a shift, everyone else in the same department is offered it.
+      </p>
+
+      <div id="departmentChips" style="display: flex; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 1rem;">
+        <% (organization?.settings?.departments || []).forEach(dept => { %>
+          <span class="department-chip">
+            <%= dept %>
+            <button type="button" onclick="removeDepartment('<%= dept.replace(/'/g, "\\'") %>')" aria-label="Remove <%= dept %>">&times;</button>
+          </span>
+        <% }); %>
+        <% if (!organization?.settings?.departments || organization.settings.departments.length === 0) { %>
+          <span id="noDepartmentsNote" style="color: #6b7280; font-size: 0.875rem;">No departments yet - add one below.</span>
+        <% } %>
+      </div>
+
+      <form onsubmit="addDepartment(event)" style="display: flex; gap: 0.5rem; max-width: 400px;">
+        <input type="text" id="newDepartmentInput" placeholder="e.g. Cashier" maxlength="100" style="flex: 1; padding: 0.75rem; border: 1px solid #d1d5db; border-radius: 6px;">
+        <button type="submit" class="btn btn-secondary">Add</button>
+      </form>
+
+      <div id="departmentsStatusMessage" style="margin-top: 1rem; padding: 0.75rem; border-radius: 6px; display: none;"></div>
     </div>
 
     <!-- Timezone Settings Section -->
@@ -216,9 +252,38 @@
           </small>
         </div>
 
+        <div class="form-group">
+          <label>Phone (optional)</label>
+          <input type="tel" name="phone" placeholder="e.g. 5555550100">
+          <small style="color: #666; display: block; margin-top: 0.25rem;">
+            Used for shift-coverage approval texts (a teammate covering another employee's shift).
+          </small>
+        </div>
+
         <div class="modal-actions">
           <button type="submit" class="btn btn-primary">Create Admin</button>
           <button type="button" onclick="closeModal('addAdminModal')" class="btn btn-secondary">Cancel</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Edit Admin Phone Modal -->
+  <div id="editAdminPhoneModal" class="modal" style="display: none;">
+    <div class="modal-content">
+      <h2>Update Phone Number</h2>
+      <form id="editAdminPhoneForm" onsubmit="submitAdminPhone(event)">
+        <input type="hidden" id="editAdminPhoneId">
+        <div class="form-group">
+          <label>Phone</label>
+          <input type="tel" id="editAdminPhoneInput" placeholder="e.g. 5555550100">
+          <small style="color: #666; display: block; margin-top: 0.25rem;">
+            Leave blank to remove the phone number.
+          </small>
+        </div>
+        <div class="modal-actions">
+          <button type="submit" class="btn btn-primary">Save</button>
+          <button type="button" onclick="closeModal('editAdminPhoneModal')" class="btn btn-secondary">Cancel</button>
         </div>
       </form>
     </div>
@@ -246,9 +311,134 @@
       border-color: #4f46e5;
       box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1);
     }
+
+    /* Department Chips */
+    .department-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      background: #eef2ff;
+      color: #3730a3;
+      border-radius: 999px;
+      padding: 0.35rem 0.5rem 0.35rem 0.85rem;
+      font-size: 0.875rem;
+      font-weight: 500;
+    }
+
+    .department-chip button {
+      background: none;
+      border: none;
+      color: #4f46e5;
+      cursor: pointer;
+      font-size: 1.1rem;
+      line-height: 1;
+      padding: 0 0.25rem;
+    }
+
+    .department-chip button:hover {
+      color: #ef4444;
+    }
   </style>
 
   <script>
+    // Departments
+    let currentDepartments = <%- JSON.stringify(organization?.settings?.departments || []) %>;
+
+    function renderDepartmentChips() {
+      const container = document.getElementById('departmentChips');
+      if (currentDepartments.length === 0) {
+        container.innerHTML = '<span id="noDepartmentsNote" style="color: #6b7280; font-size: 0.875rem;">No departments yet - add one below.</span>';
+        return;
+      }
+      container.innerHTML = currentDepartments.map(dept => `
+        <span class="department-chip">
+          ${escapeHtml(dept)}
+          <button type="button" onclick="removeDepartment('${dept.replace(/'/g, "\\'")}')" aria-label="Remove ${escapeHtml(dept)}">&times;</button>
+        </span>
+      `).join('');
+    }
+
+    function escapeHtml(text) {
+      const div = document.createElement('div');
+      div.textContent = text;
+      return div.innerHTML;
+    }
+
+    async function saveDepartments() {
+      const statusMessage = document.getElementById('departmentsStatusMessage');
+      try {
+        const response = await fetch('/api/organization/settings/departments', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ departments: currentDepartments })
+        });
+        const result = await response.json();
+        if (!response.ok || !result.success) throw new Error(result.error || 'Failed to update departments');
+
+        currentDepartments = result.departments;
+        renderDepartmentChips();
+
+        statusMessage.style.display = 'block';
+        statusMessage.style.background = '#d1fae5';
+        statusMessage.style.color = '#065f46';
+        statusMessage.style.border = '1px solid #10b981';
+        statusMessage.textContent = '✅ Departments updated';
+      } catch (error) {
+        statusMessage.style.display = 'block';
+        statusMessage.style.background = '#fee2e2';
+        statusMessage.style.color = '#991b1b';
+        statusMessage.style.border = '1px solid #ef4444';
+        statusMessage.textContent = '❌ ' + error.message;
+      } finally {
+        setTimeout(() => { statusMessage.style.display = 'none'; }, 3000);
+      }
+    }
+
+    function addDepartment(e) {
+      e.preventDefault();
+      const input = document.getElementById('newDepartmentInput');
+      const value = input.value.trim();
+      if (!value) return;
+      if (!currentDepartments.some(d => d.toLowerCase() === value.toLowerCase())) {
+        currentDepartments.push(value);
+        saveDepartments();
+      }
+      input.value = '';
+    }
+
+    function removeDepartment(dept) {
+      currentDepartments = currentDepartments.filter(d => d !== dept);
+      saveDepartments();
+    }
+
+    // Admin phone
+    function editAdminPhone(adminId, currentPhone) {
+      document.getElementById('editAdminPhoneId').value = adminId;
+      document.getElementById('editAdminPhoneInput').value = currentPhone || '';
+      document.getElementById('editAdminPhoneModal').style.display = 'flex';
+    }
+
+    async function submitAdminPhone(e) {
+      e.preventDefault();
+      const adminId = document.getElementById('editAdminPhoneId').value;
+      const phone = document.getElementById('editAdminPhoneInput').value.trim();
+
+      try {
+        const response = await fetch(`/admin/update-admin-phone/${adminId}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ phone })
+        });
+        const result = await response.json();
+        if (!response.ok || !result.success) throw new Error(result.error || 'Failed to update phone');
+
+        closeModal('editAdminPhoneModal');
+        location.reload();
+      } catch (error) {
+        alert('Error: ' + error.message);
+      }
+    }
+
     // Update AI Provider
     async function updateLLMProvider(llm_provider) {
       const statusMessage = document.getElementById('llmProviderStatusMessage');
@@ -428,7 +618,8 @@
       const data = {
         name: formData.get('name'),
         email: formData.get('email'),
-        password: formData.get('password')
+        password: formData.get('password'),
+        phone: formData.get('phone') || null
       };
 
       try {

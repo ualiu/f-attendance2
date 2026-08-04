@@ -28,12 +28,13 @@
             <th>Name</th>
             <th>Employee ID</th>
             <th>Shift</th>
+            <th>Department</th>
           </tr>
         </thead>
         <tbody id="employeeTableBody">
           <% if (employees.length === 0) { %>
             <tr>
-              <td colspan="3" class="no-data">No employees yet. Add your first employee above.</td>
+              <td colspan="4" class="no-data">No employees yet. Add your first employee above.</td>
             </tr>
           <% } else { %>
             <% employees.forEach(emp => { %>
@@ -41,6 +42,7 @@
                 <td><a href="/dashboard/employee/<%= emp._id %>"><%= emp.name %></a></td>
                 <td><%= emp.employee_id %></td>
                 <td><%= emp.shift %></td>
+                <td><%= emp.department || '—' %></td>
               </tr>
             <% }); %>
           <% } %>
@@ -73,6 +75,21 @@
             <option value="Night">Night</option>
             <option value="Weekend">Weekend</option>
           </select>
+        </div>
+        <div class="form-group">
+          <label>Department</label>
+          <select name="department">
+            <option value="">— None —</option>
+            <% (organization?.settings?.departments || []).forEach(dept => { %>
+              <option value="<%= dept %>"><%= dept %></option>
+            <% }); %>
+          </select>
+          <small style="color: #666; display: block; margin-top: 0.25rem;">
+            Used to find coverage when this employee can't make a shift.
+            <% if (!organization?.settings?.departments || organization.settings.departments.length === 0) { %>
+              No departments set up yet — add some in <a href="/admin/invite-admin">Account Settings</a>.
+            <% } %>
+          </small>
         </div>
         <div class="form-group">
           <label>Start Date</label>
@@ -111,6 +128,15 @@
             <option value="Day">Day</option>
             <option value="Night">Night</option>
             <option value="Weekend">Weekend</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Department</label>
+          <select name="department" id="edit_department">
+            <option value="">— None —</option>
+            <% (organization?.settings?.departments || []).forEach(dept => { %>
+              <option value="<%= dept %>"><%= dept %></option>
+            <% }); %>
           </select>
         </div>
         <div class="form-group">
@@ -162,6 +188,9 @@
       e.preventDefault();
       const formData = new FormData(e.target);
       const data = Object.fromEntries(formData);
+      // "— None —" must be null, not "" - an empty string would make every
+      // department-less employee look like they share a (fake) department.
+      if (!data.department) data.department = null;
 
       const response = await fetch('/api/employees', {
         method: 'POST',
@@ -203,6 +232,7 @@
       document.getElementById('edit_employee_code').value = employee.employee_id;
       document.getElementById('edit_phone').value = employee.phone;
       document.getElementById('edit_shift').value = employee.shift;
+      document.getElementById('edit_department').value = employee.department || '';
       document.getElementById('edit_start_date').value = employee.start_date ? new Date(employee.start_date).toISOString().split('T')[0] : '';
 
       // Show modal
@@ -213,6 +243,7 @@
       e.preventDefault();
       const formData = new FormData(e.target);
       const data = Object.fromEntries(formData);
+      if (!data.department) data.department = null;
       const employeeId = data.employee_id;
       delete data.employee_id;
 

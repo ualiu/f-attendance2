@@ -70,33 +70,28 @@ exports.getTodaysSummary = async (organizationId) => {
 
   const totalEmployees = await Employee.countDocuments(scopeQuery(organizationId));
 
-  // Count unique employees (not total records) to handle multiple absences per employee
-  const uniqueEmployeesWithAbsences = new Set();
-  const uniqueLateEmployees = new Set();
+  // Count unique employees (not total records) to handle multiple absences per employee.
+  // The dashboard's daily snapshot doesn't distinguish "late" as its own category -
+  // someone who showed up late still showed up, so a late report doesn't count
+  // against presence. (Individual late reports are still recorded on the
+  // Absence itself and visible on the employee's own history/reports page -
+  // this only affects the dashboard's today-at-a-glance counts.)
   const uniqueAbsentEmployees = new Set();
 
   todaysAbsences.forEach(absence => {
     const empId = absence.employee_id?._id?.toString() || absence.employee_id?.toString();
-    if (empId) {
-      uniqueEmployeesWithAbsences.add(empId);
-
-      if (absence.type === 'late') {
-        uniqueLateEmployees.add(empId);
-      } else {
-        uniqueAbsentEmployees.add(empId);
-      }
+    if (empId && absence.type !== 'late') {
+      uniqueAbsentEmployees.add(empId);
     }
   });
 
   const absentCount = uniqueAbsentEmployees.size;
-  const lateCount = uniqueLateEmployees.size;
-  const presentCount = Math.max(0, totalEmployees - absentCount - lateCount); // Prevent negative
+  const presentCount = Math.max(0, totalEmployees - absentCount); // Prevent negative
 
   return {
     totalEmployees,
     presentCount,
     absentCount,
-    lateCount,
     absences: todaysAbsences
   };
 };

@@ -12,12 +12,15 @@ const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
 
-// Call the configured LLM provider and return the raw text response
-async function callLLM(prompt, { provider = 'claude', maxTokens = 500 } = {}) {
+// Call the configured LLM provider and return the raw text response.
+// `model` lets a caller override the default (e.g. coverageService uses a
+// cheaper model for yes/no reply classification without touching the
+// absence-parsing default below).
+async function callLLM(prompt, { provider = 'claude', maxTokens = 500, model = null } = {}) {
   if (provider === 'openai') {
     console.log('   🔄 Calling OpenAI API...');
     const completion = await openai.chat.completions.create({
-      model: process.env.OPENAI_MODEL || 'gpt-4o',
+      model: model || process.env.OPENAI_MODEL || 'gpt-4o',
       max_tokens: maxTokens,
       messages: [{ role: 'user', content: prompt }]
     });
@@ -27,13 +30,15 @@ async function callLLM(prompt, { provider = 'claude', maxTokens = 500 } = {}) {
 
   console.log('   🔄 Calling Claude API...');
   const message = await anthropic.messages.create({
-    model: 'claude-opus-4-5-20251101',
+    model: model || process.env.ANTHROPIC_MODEL || 'claude-opus-4-5-20251101',
     max_tokens: maxTokens,
     messages: [{ role: 'user', content: prompt }]
   });
   console.log('   ✅ Claude API responded');
   return message.content[0].text;
 }
+
+exports.callLLM = callLLM;
 
 // ── Conversation memory semantics ────────────────────────────────────────────
 // "Ambiguous" placeholders must NEVER overwrite an established concrete value;

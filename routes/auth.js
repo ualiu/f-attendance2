@@ -165,7 +165,7 @@ router.post(
   ensureSuperAdmin,
   async (req, res) => {
     try {
-      const { name, email, password } = req.body;
+      const { name, email, password, phone } = req.body;
 
       // Validate
       if (!name || !email || !password) {
@@ -200,6 +200,7 @@ router.post(
         organization_id: req.organizationId,
         is_active: true,
         first_login: null,
+        phone: phone || null, // used by shift-coverage manager-approval texts
       });
 
       console.log(`✅ Admin created: ${newAdmin.email} by ${req.user.email}`);
@@ -211,6 +212,7 @@ router.post(
           name: newAdmin.name,
           email: newAdmin.email,
           role: newAdmin.role,
+          phone: newAdmin.phone,
         },
         message: "Admin account created successfully",
       });
@@ -270,6 +272,40 @@ router.post(
         success: false,
         error: error.message,
       });
+    }
+  }
+);
+
+// Set/update an admin's phone number (super admin only). Needed because
+// existing admins - including the super admin, who is the fallback approver
+// for shift-coverage when an employee's own supervisor has none set - were
+// created before this field had a UI.
+router.post(
+  "/admin/update-admin-phone/:id",
+  requireTenantAuth,
+  ensureSuperAdmin,
+  async (req, res) => {
+    try {
+      const { phone } = req.body;
+
+      const admin = await Supervisor.findOne({
+        _id: req.params.id,
+        organization_id: req.organizationId,
+      });
+
+      if (!admin) {
+        return res.status(404).json({ success: false, error: "Admin not found" });
+      }
+
+      admin.phone = phone ? String(phone).trim() : null;
+      await admin.save();
+
+      console.log(`✅ Phone updated for ${admin.email} by ${req.user.email}`);
+
+      res.json({ success: true, admin: { _id: admin._id, phone: admin.phone } });
+    } catch (error) {
+      console.error("Error updating admin phone:", error);
+      res.status(500).json({ success: false, error: error.message });
     }
   }
 );

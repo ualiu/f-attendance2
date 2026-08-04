@@ -150,4 +150,37 @@ router.put('/settings/shift-times', async (req, res) => {
   }
 });
 
+// Update the departments list (used for shift-coverage candidate matching -
+// Employee.department must be one of these values to be matched to peers).
+router.put('/settings/departments', async (req, res) => {
+  try {
+    const { departments } = req.body;
+
+    if (!Array.isArray(departments)) {
+      return res.status(400).json({ success: false, error: 'departments must be an array' });
+    }
+
+    const cleaned = [...new Set(
+      departments
+        .map(d => String(d || '').trim())
+        .filter(d => d.length > 0 && d.length <= 100)
+    )].slice(0, 50);
+
+    const organization = await Organization.findById(req.organizationId);
+    if (!organization) {
+      return res.status(404).json({ success: false, error: 'Organization not found' });
+    }
+
+    organization.settings.departments = cleaned;
+    await organization.save();
+
+    console.log(`✅ Organization ${organization.name} departments updated: ${cleaned.join(', ')}`);
+
+    res.json({ success: true, message: 'Departments updated successfully', departments: cleaned });
+  } catch (error) {
+    console.error('Error updating departments:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
 module.exports = router;

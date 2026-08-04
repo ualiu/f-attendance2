@@ -64,7 +64,7 @@ router.get('/:id', async (req, res) => {
 // Create employee (tenant-scoped)
 router.post('/', async (req, res) => {
   try {
-    const { employee_id, name, phone, shift } = req.body;
+    const { employee_id, name, phone, shift, department } = req.body;
 
     // Assign supervisor if authenticated user is a supervisor
     const supervisor_id = req.user._id;
@@ -74,6 +74,7 @@ router.post('/', async (req, res) => {
       name,
       phone,
       shift,
+      department: department || null,
       supervisor_id,
       organization_id: req.organizationId // CRITICAL: Assign to user's organization
     });

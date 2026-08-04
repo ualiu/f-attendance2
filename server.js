@@ -95,6 +95,7 @@ app.use('/api/employees', require('./routes/employees'));
 app.use('/api/absences', require('./routes/absences'));
 app.use('/api/organization', require('./routes/organization'));
 app.use('/api/sms', require('./routes/sms'));
+app.use('/api/coverage', require('./routes/coverage'));
 app.use('/reports', require('./routes/reports'));
 
 // Root route - landing page
@@ -123,10 +124,24 @@ app.use((req, res) => {
 // Error handler
 app.use(errorHandler);
 
+// Shift coverage (Phase 3+) sends outbound SMS via the Twilio REST client, which
+// needs the ACCOUNT SID (starts with "AC"), not an API Key SID (starts with "SK").
+// Every Twilio interaction before this feature was an inbound-webhook TwiML reply,
+// which never needed these credentials - so a wrong value here was invisible until now.
+if (process.env.TWILIO_ACCOUNT_SID && !process.env.TWILIO_ACCOUNT_SID.startsWith('AC')) {
+  console.warn('\n⚠️  TWILIO_ACCOUNT_SID does not start with "AC" - it looks like an API Key SID.');
+  console.warn('    Outbound SMS (shift coverage) will fail authentication until this is fixed.\n');
+}
+
 const PORT = process.env.PORT || 3000;
 
 app.listen(PORT, () => {
   console.log(`\n🚀 Felton Attendance System running on port ${PORT}`);
   console.log(`📍 Local: http://localhost:${PORT}`);
   console.log(`🔐 Login at: http://localhost:${PORT}/login\n`);
+
+  // Only the live server starts the sweep - scripts that require services
+  // directly (the test harnesses) never call this, so they can't accidentally
+  // leave a background timer running.
+  require('./services/coverageScheduler').start();
 });

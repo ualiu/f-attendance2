@@ -57,6 +57,12 @@ const organizationSchema = new mongoose.Schema({
       enum: ['claude', 'openai'],
       default: 'claude'
     },
+    // Employee.department values are free text drawn from this list, managed
+    // by admins on the Account Settings page. Used for shift-coverage matching.
+    departments: {
+      type: [String],
+      default: []
+    },
     timezone: {
       type: String,
       default: 'America/New_York' // Eastern Time (ET)

@@ -4,6 +4,7 @@ const { requireTenantAuth } = require('../middleware/auth');
 const { scopeQuery, validateTenantAccess } = require('../utils/tenantHelper');
 const Employee = require('../models/Employee');
 const Absence = require('../models/Absence');
+const ShiftOffer = require('../models/ShiftOffer');
 const attendanceService = require('../services/attendanceService');
 
 // All dashboard routes require authentication + tenant scoping
@@ -15,16 +16,31 @@ router.get('/', async (req, res) => {
     // Get today's summary (tenant-scoped)
     const todaysSummary = await attendanceService.getTodaysSummary(req.organizationId);
 
-    // Get recent absence reports (last 10, tenant-scoped)
-    const recentAbsences = await Absence.find(scopeQuery(req.organizationId))
+    // Get recent absence reports (last 10, tenant-scoped). Lates are excluded -
+    // the dashboard no longer tracks them as a category (still visible on the
+    // employee's own history and the Reports page).
+    const recentAbsences = await Absence.find(scopeQuery(req.organizationId, { type: { $ne: 'late' } }))
       .populate('employee_id')
       .sort({ report_time: -1 })
       .limit(10);
 
+    // Recent shift-coverage offers, for the Shift Coverage card
+    const shiftOffers = await ShiftOffer.find(scopeQuery(req.organizationId))
+      .sort({ createdAt: -1 })
+      .limit(20);
+
+    // Which of the visible absences already have an offer, so "Find coverage"
+    // buttons can reflect that instead of letting an admin start a duplicate.
+    const absenceIdsWithOffers = new Set(
+      shiftOffers.map(o => String(o.absence_id))
+    );
+
     res.render('dashboard/index', {
       title: 'Dashboard',
       todaysSummary,
-      recentAbsences
+      recentAbsences,
+      shiftOffers,
+      absenceIdsWithOffers
     });
   } catch (error) {
     console.error('Error loading dashboard:', error);
@@ -89,8 +105,8 @@ router.get('/api/data', async (req, res) => {
   try {
     const todaysSummary = await attendanceService.getTodaysSummary(req.organizationId);
 
-    // Get recent absence reports (last 10, tenant-scoped)
-    const recentAbsences = await Absence.find(scopeQuery(req.organizationId))
+    // Get recent absence reports (last 10, tenant-scoped, lates excluded - see main route)
+    const recentAbsences = await Absence.find(scopeQuery(req.organizationId, { type: { $ne: 'late' } }))
       .populate('employee_id')
       .sort({ report_time: -1 })
       .limit(10)

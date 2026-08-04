@@ -33,10 +33,67 @@
           <h3>Absent Today</h3>
           <div class="stat-value"><%= todaysSummary.absentCount %></div>
         </div>
+      </div>
 
-        <div class="stat-card stat-info">
-          <h3>Late Today</h3>
-          <div class="stat-value"><%= todaysSummary.lateCount %></div>
+      <!-- Shift Coverage -->
+      <div class="recent-absences-section" style="margin-bottom: 2rem;">
+        <h2>Shift Coverage</h2>
+        <div class="table-responsive">
+          <table class="absences-table">
+            <thead>
+              <tr>
+                <th>Absent Employee</th>
+                <th>Shift</th>
+                <th>Status</th>
+                <th>Claimed By</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="coverageTableBody">
+              <% if (!shiftOffers || shiftOffers.length === 0) { %>
+              <tr>
+                <td colspan="5" class="no-data">No coverage requests yet</td>
+              </tr>
+              <% } else { %>
+                <% shiftOffers.forEach(offer => { %>
+                <tr>
+                  <td><%= offer.absent_employee.name %></td>
+                  <td>
+                    <%= offer.day_label %><% if (offer.absent_employee.department) { %> · <%= offer.absent_employee.department %><% } %>
+                    (<%= offer.shift_start %> - <%= offer.shift_end %>)
+                  </td>
+                  <td>
+                    <span class="type-badge" style="background:
+                      <%= offer.status === 'approved' ? '#10b981'
+                        : offer.status === 'claimed' ? '#f59e0b'
+                        : offer.status === 'open' ? '#3b82f6'
+                        : offer.status === 'unfilled' ? '#ef4444'
+                        : offer.status === 'send_failed' ? '#ef4444'
+                        : '#9ca3af' %>; color: white;">
+                      <%= offer.status.replace(/_/g, ' ') %>
+                    </span>
+                    <% if (offer.needs_dashboard_approval && offer.status === 'claimed') { %>
+                      <span style="color: #ef4444; font-size: 0.75rem; display: block; margin-top: 0.25rem;">No manager phone - approve here</span>
+                    <% } %>
+                  </td>
+                  <td><%= offer.claimed_by && offer.claimed_by.name ? offer.claimed_by.name : '—' %></td>
+                  <td>
+                    <% if (offer.status === 'claimed') { %>
+                      <button onclick="approveCoverage('<%= offer._id %>')" class="btn-small" style="background: #10b981;">Approve</button>
+                      <button onclick="declineCoverage('<%= offer._id %>')" class="btn-small" style="background: #ef4444;">Decline</button>
+                    <% } else if (offer.status === 'open') { %>
+                      <span style="color: #6b7280; font-size: 0.85rem;">
+                        <%= offer.candidates.filter(c => c.response === 'pending').length %> / <%= offer.candidates.length %> pending
+                      </span>
+                    <% } else { %>
+                      <span style="color: #9ca3af;">-</span>
+                    <% } %>
+                  </td>
+                </tr>
+                <% }); %>
+              <% } %>
+            </tbody>
+          </table>
         </div>
       </div>
 
@@ -83,6 +140,17 @@
                     class="btn-small"
                   >
                     View SMS
+                  </button>
+                  <% } %>
+                  <% if (absenceIdsWithOffers && absenceIdsWithOffers.has(String(absence._id))) { %>
+                  <button class="btn-small" disabled style="opacity: 0.6; cursor: default;">Coverage started</button>
+                  <% } else if (absence.type !== 'late') { %>
+                  <button
+                    onclick="findCoverage('<%= absence._id %>', this)"
+                    class="btn-small"
+                    style="background: #6366f1;"
+                  >
+                    Find coverage
                   </button>
                   <% } %>
                 </td>
@@ -276,6 +344,45 @@
       // Close SMS modal
       function closeSmsModal() {
         document.getElementById("smsModal").style.display = "none";
+      }
+
+      // Shift coverage actions
+      async function approveCoverage(offerId) {
+        try {
+          const response = await fetch(`/api/coverage/${offerId}/approve`, { method: "POST" });
+          const data = await response.json();
+          if (!data.success) throw new Error(data.error || "Failed to approve");
+          location.reload();
+        } catch (error) {
+          alert("Error: " + error.message);
+        }
+      }
+
+      async function declineCoverage(offerId) {
+        if (!confirm("Decline this coverage claim? The employee who claimed it will be notified.")) return;
+        try {
+          const response = await fetch(`/api/coverage/${offerId}/decline`, { method: "POST" });
+          const data = await response.json();
+          if (!data.success) throw new Error(data.error || "Failed to decline");
+          location.reload();
+        } catch (error) {
+          alert("Error: " + error.message);
+        }
+      }
+
+      async function findCoverage(absenceId, buttonEl) {
+        buttonEl.disabled = true;
+        buttonEl.textContent = "Starting...";
+        try {
+          const response = await fetch(`/api/coverage/start/${absenceId}`, { method: "POST" });
+          const data = await response.json();
+          if (!data.success) throw new Error(data.error || "Failed to start coverage");
+          location.reload();
+        } catch (error) {
+          alert("Error: " + error.message);
+          buttonEl.disabled = false;
+          buttonEl.textContent = "Find coverage";
+        }
       }
 
       // Close modal when clicking outside

@@ -138,6 +138,110 @@
         overflow-wrap: break-word;
       }
 
+      /* Industry ticker - one continuous line naming who this is built for.
+         The track holds two identical copies of the list and translates by
+         exactly -50%, so copy two lands where copy one started and the loop
+         is seamless with no visible jump. */
+      /* No padding-top: the hero's own padding-bottom sits above the line.
+         padding-bottom is set to (hero bottom - .demo top) so the ticker has
+         equal air above and below at every breakpoint - keep the three in
+         sync if any of those change. */
+      .industries {
+        padding: 0 0 3rem;
+        overflow: hidden;
+        flex-shrink: 0;
+        /* Fade both edges into the background rather than hard-cutting a
+           word at the viewport edge. */
+        -webkit-mask-image: linear-gradient(
+          90deg,
+          transparent,
+          #000 10%,
+          #000 90%,
+          transparent
+        );
+        mask-image: linear-gradient(
+          90deg,
+          transparent,
+          #000 10%,
+          #000 90%,
+          transparent
+        );
+      }
+
+      .industries-track {
+        display: flex;
+        width: max-content;
+        animation: industryScroll 38s linear infinite;
+      }
+
+      /* Let a reader stop the line to actually read it. */
+      .industries:hover .industries-track {
+        animation-play-state: paused;
+      }
+
+      .industries-group {
+        display: flex;
+        flex-shrink: 0;
+      }
+
+      .industry {
+        display: flex;
+        align-items: center;
+        gap: 2.25rem;
+        padding-right: 2.25rem;
+        font-size: 0.8125rem;
+        font-weight: 500;
+        text-transform: uppercase;
+        letter-spacing: 0.14em;
+        color: var(--text-secondary);
+        white-space: nowrap;
+      }
+
+      /* Separator dot rides after every item, including the last one - that
+         is what keeps the spacing even across the seam between copies. */
+      .industry::after {
+        content: "";
+        width: 4px;
+        height: 4px;
+        border-radius: 50%;
+        background: var(--text-secondary);
+        opacity: 0.45;
+        flex-shrink: 0;
+      }
+
+      @keyframes industryScroll {
+        from {
+          transform: translateX(0);
+        }
+        to {
+          transform: translateX(-50%);
+        }
+      }
+
+      /* No motion: drop the duplicate copy and let the single list wrap and
+         centre as a static line instead of scrolling. */
+      @media (prefers-reduced-motion: reduce) {
+        .industries {
+          -webkit-mask-image: none;
+          mask-image: none;
+          padding: 0 5% 3rem;
+        }
+
+        .industries-track {
+          animation: none;
+          width: 100%;
+        }
+
+        .industries-group {
+          flex-wrap: wrap;
+          justify-content: center;
+        }
+
+        .industries-group[aria-hidden="true"] {
+          display: none;
+        }
+      }
+
       /* Demo */
       .demo {
         padding: 1rem 5% 5rem;
@@ -183,6 +287,16 @@
         font-size: 0.8125rem;
         line-height: 1.65;
         color: var(--text-primary);
+        /* Grid, with every slide stacked in the same cell (see .demo-slide
+           below) - the row sizes to the TALLEST slide regardless of which
+           one is active, so the frame no longer changes height when you
+           flip between a 4-message and a 3-message example. */
+        display: grid;
+        /* Swipe is handled by JS (touchstart/move/end); this tells the
+           browser vertical scrolling is still native while horizontal
+           gestures are ours to interpret, so a swipe doesn't fight the
+           page scroll. */
+        touch-action: pan-y;
       }
 
       .demo-head {
@@ -192,38 +306,181 @@
         border-bottom: 1px solid var(--border);
       }
 
+      /* Chat bubbles. Font switches to the site's normal sans here - the
+         monospace above is for the log-style header block, but a text
+         message rendered in monospace reads as a terminal, not a phone. */
       .demo-msg {
-        margin-bottom: 1.25rem;
-        padding-left: 0.875rem;
-        border-left: 2px solid var(--border);
+        display: flex;
+        flex-direction: column;
+        margin-bottom: 1rem;
+        max-width: 100%;
       }
 
       .demo-msg:last-child {
         margin-bottom: 0;
       }
 
+      /* Employee = the other party, left side (received). System = the
+         business's own automated texts, right side (sent) - the usual
+         messaging-app convention. */
       .demo-msg.is-employee {
-        border-left-color: var(--border-strong);
+        align-items: flex-start;
       }
 
       .demo-msg.is-system {
-        border-left-color: #4ade80;
+        align-items: flex-end;
       }
 
       .demo-meta {
+        font-family:
+          "Inter",
+          -apple-system,
+          BlinkMacSystemFont,
+          "Segoe UI",
+          Roboto,
+          sans-serif;
         color: var(--text-secondary);
-        font-size: 0.75rem;
-        margin-bottom: 0.25rem;
+        font-size: 0.6875rem;
+        margin-bottom: 0.3rem;
+        padding: 0 0.3rem;
       }
 
-      .demo-text {
+      .demo-bubble {
+        font-family:
+          "Inter",
+          -apple-system,
+          BlinkMacSystemFont,
+          "Segoe UI",
+          Roboto,
+          sans-serif;
+        max-width: 82%;
+        padding: 0.625rem 0.875rem;
+        border-radius: 16px;
+        font-size: 0.8125rem;
+        line-height: 1.5;
         word-wrap: break-word;
         overflow-wrap: break-word;
       }
 
+      .demo-msg.is-employee .demo-bubble {
+        background: var(--surface-raised);
+        border: 1px solid var(--border);
+        border-bottom-left-radius: 4px;
+        color: var(--text-primary);
+      }
+
+      .demo-msg.is-system .demo-bubble {
+        background: rgba(74, 222, 128, 0.14);
+        border: 1px solid rgba(74, 222, 128, 0.35);
+        border-bottom-right-radius: 4px;
+        color: var(--text-primary);
+      }
+
+      /* Carousel */
+      .demo-caption {
+        font-size: 0.8125rem;
+        font-weight: 600;
+        color: #4ade80;
+        letter-spacing: 0.02em;
+        margin-bottom: 1rem;
+      }
+
+      .demo-slide {
+        /* All three stack in the same grid cell (see .demo-body) - this is
+           what makes the frame's height driven by the tallest slide instead
+           of whichever one happens to be active. visibility (not
+           display:none) keeps inactive slides counted for that sizing while
+           still removing them from tab order / assistive tech / clicks. */
+        grid-row: 1;
+        grid-column: 1;
+        visibility: hidden;
+        opacity: 0;
+        pointer-events: none;
+        min-width: 0;
+      }
+
+      .demo-slide.is-active {
+        visibility: visible;
+        opacity: 1;
+        pointer-events: auto;
+        animation: demoFadeIn 0.35s ease;
+      }
+
+      @keyframes demoFadeIn {
+        from {
+          opacity: 0;
+          transform: translateY(4px);
+        }
+        to {
+          opacity: 1;
+          transform: translateY(0);
+        }
+      }
+
+      .demo-nav {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 1.25rem;
+        margin-top: 1.5rem;
+      }
+
+      .demo-arrow {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 36px;
+        height: 36px;
+        border-radius: 50%;
+        border: 1px solid var(--border);
+        background: transparent;
+        color: var(--text-primary);
+        font-size: 1rem;
+        cursor: pointer;
+        transition: all 0.2s;
+        flex-shrink: 0;
+      }
+
+      .demo-arrow:hover {
+        border-color: var(--border-strong);
+        background: var(--surface);
+      }
+
+      .demo-dots-nav {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+      }
+
+      .carousel-dot {
+        width: 8px;
+        height: 8px;
+        padding: 0;
+        border: none;
+        border-radius: 50%;
+        background: var(--border);
+        cursor: pointer;
+        transition: all 0.2s;
+      }
+
+      .carousel-dot.is-active {
+        width: 20px;
+        border-radius: 4px;
+        background: #4ade80;
+      }
+
+      @media (hover: none) and (pointer: coarse) {
+        .demo-arrow {
+          min-height: 44px;
+          min-width: 44px;
+        }
+      }
+
       /* Features */
+      /* 5rem top and bottom, matching .cta-section - each section sits
+         centred between its own rules. */
       .features {
-        padding: 4rem 5% 5rem;
+        padding: 5rem 5%;
         border-top: 1px solid var(--border);
         flex: 1;
       }
@@ -258,10 +515,20 @@
         border-color: var(--border-strong);
       }
 
-      .feature-icon {
-        font-size: 2rem;
-        margin-bottom: 1rem;
+      /* Step line rather than icons - "How It Works" is a sequence, so the
+         numeral carries the step ("01 · EMPLOYEE TEXTS") and the h3 below is
+         free to carry the benefit. Same letter-spaced treatment as the hero
+         eyebrow, so it stays on the page's typographic system. */
+      .feature-step {
         display: block;
+        font-size: 0.75rem;
+        font-weight: 500;
+        text-transform: uppercase;
+        letter-spacing: 0.14em;
+        color: var(--text-secondary);
+        margin-bottom: 1rem;
+        padding-bottom: 1rem;
+        border-bottom: 1px solid var(--border);
       }
 
       .feature-card h3 {
@@ -360,6 +627,11 @@
           padding: 3.5rem 4% 3rem;
         }
 
+        /* hero bottom (3) - demo top (1) = 2rem, keeping the ticker centred */
+        .industries {
+          padding: 0 0 2rem;
+        }
+
         .demo {
           padding: 1rem 4% 3.5rem;
         }
@@ -406,6 +678,11 @@
 
         .hero {
           padding: 3rem 5% 2.5rem;
+        }
+
+        /* hero bottom (2.5) - demo top (1) = 1.5rem */
+        .industries {
+          padding: 0 0 1.5rem;
         }
 
         .demo {
@@ -459,6 +736,11 @@
 
         .hero {
           padding: 2.5rem 4% 2rem;
+        }
+
+        /* hero bottom (2) - demo top (1) = 1rem */
+        .industries {
+          padding: 0 0 1rem;
         }
 
         .hero .eyebrow {
@@ -527,6 +809,11 @@
           padding: 2rem 5%;
         }
 
+        /* hero bottom (2) - demo top (1) = 1rem */
+        .industries {
+          padding: 0 0 1rem;
+        }
+
         .hero h1 {
           margin-bottom: 1rem;
         }
@@ -549,10 +836,33 @@
       <p class="eyebrow">Employee Attendance Management</p>
       <h1>Automate employee call-ins with AI</h1>
       <p>
-        When employees can't make it to work, they text the AI assistant instead
-        of the manager. AI handles the conversation &amp; reporting.
+        AI assistant that handles employee call-ins &amp; fills shift gaps via
+        SMS. Manager always approves.
       </p>
       <a href="/contact" class="cta-button-outline">Talk to us</a>
+    </section>
+
+    <!-- Industries. The second .industries-group is a visual duplicate that
+         makes the scroll seamless - aria-hidden so it isn't read twice. -->
+    <section class="industries">
+      <div class="industries-track">
+        <div class="industries-group">
+          <span class="industry">Manufacturing</span>
+          <span class="industry">Warehousing</span>
+          <span class="industry">Retail</span>
+          <span class="industry">Grocery Stores</span>
+          <span class="industry">Restaurants</span>
+          <span class="industry">Pizza Stores</span>
+        </div>
+        <div class="industries-group" aria-hidden="true">
+          <span class="industry">Manufacturing</span>
+          <span class="industry">Warehousing</span>
+          <span class="industry">Retail</span>
+          <span class="industry">Grocery Stores</span>
+          <span class="industry">Restaurants</span>
+          <span class="industry">Pizza Stores</span>
+        </div>
+      </div>
     </section>
 
     <section class="demo">
@@ -564,40 +874,137 @@
           <span class="demo-title">SMS Conversation Transcript</span>
         </div>
 
-        <div class="demo-body">
-          <div class="demo-head">
-            Employee: John Doe<br />
-            Date: Monday 2026-08-03<br />
-            Method: SMS
-          </div>
+        <div class="demo-body" id="demoBody">
+          <!-- Slide 1: the absence is reported -->
+          <div class="demo-slide is-active">
+            <p class="demo-caption">1 &middot; Employee reports the absence</p>
+            <div class="demo-head">
+              Employee: John Doe<br />
+              Date: Monday 2026-08-03<br />
+              Method: SMS
+            </div>
 
-          <div class="demo-msg is-employee">
-            <div class="demo-meta">[8:58:52 PM] 👤 Employee</div>
-            <div class="demo-text">I can't come in tomorrow</div>
-          </div>
+            <div class="demo-msg is-employee">
+              <div class="demo-meta">👤 Employee · 8:58:52 PM</div>
+              <div class="demo-bubble">I can't come in tomorrow</div>
+            </div>
 
-          <div class="demo-msg is-system">
-            <div class="demo-meta">[8:58:54 PM] 🤖 System</div>
-            <div class="demo-text">
-              Hi John, what's the reason? (e.g., appointment, errands, family
-              matter)
+            <div class="demo-msg is-system">
+              <div class="demo-meta">🤖 System · 8:58:54 PM</div>
+              <div class="demo-bubble">
+                Hi John, what's the reason? (e.g., appointment, errands, family
+                matter)
+              </div>
+            </div>
+
+            <div class="demo-msg is-employee">
+              <div class="demo-meta">👤 Employee · 8:59:05 PM</div>
+              <div class="demo-bubble">I have an appointment</div>
+            </div>
+
+            <div class="demo-msg is-system">
+              <div class="demo-meta">🤖 System · 8:59:07 PM</div>
+              <div class="demo-bubble">
+                Got it, John. Logged: out all day (personal) tomorrow -
+                Appointment. ✅ If that's not right, just reply and tell me what
+                to change.
+              </div>
             </div>
           </div>
 
-          <div class="demo-msg is-employee">
-            <div class="demo-meta">[8:59:05 PM] 👤 Employee</div>
-            <div class="demo-text">I have an appointment</div>
+          <!-- Slide 2: the AI finds someone to cover it -->
+          <div class="demo-slide">
+            <p class="demo-caption">2 &middot; AI finds someone to cover it</p>
+            <div class="demo-head">
+              Employee: Mary Jones<br />
+              Shift: Cashier, Tomorrow<br />
+              Method: SMS
+            </div>
+
+            <div class="demo-msg is-system">
+              <div class="demo-meta">🤖 System · 9:01:12 PM</div>
+              <div class="demo-bubble">
+                Hi Mary, tomorrow's Cashier shift (7:00 AM - 3:00 PM) at
+                Riverside Market is up for grabs. Reply YES to claim it, or NO
+                if you can't.
+              </div>
+            </div>
+
+            <div class="demo-msg is-employee">
+              <div class="demo-meta">👤 Employee · 9:02:03 PM</div>
+              <div class="demo-bubble">yes</div>
+            </div>
+
+            <div class="demo-msg is-system">
+              <div class="demo-meta">🤖 System · 9:02:04 PM</div>
+              <div class="demo-bubble">
+                Thanks Mary! You've got first dibs on tomorrow's Cashier shift
+                (7:00 AM - 3:00 PM). We're just checking with the manager -
+                we'll text you the moment it's confirmed.
+              </div>
+            </div>
           </div>
 
-          <div class="demo-msg is-system">
-            <div class="demo-meta">[8:59:07 PM] 🤖 System</div>
-            <div class="demo-text">
-              Got it, John. Logged: out all day (personal) tomorrow -
-              Appointment. ✅ If that's not right, just reply and tell me what
-              to change.
+          <!-- Slide 3: manager approves -->
+          <div class="demo-slide">
+            <p class="demo-caption">
+              3 &middot; Manager approves with one reply
+            </p>
+            <div class="demo-head">
+              Employee: Big Boss (Manager)<br />
+              Regarding: John Doe's shift<br />
+              Method: SMS
+            </div>
+
+            <div class="demo-msg is-system">
+              <div class="demo-meta">🤖 System · 9:02:05 PM</div>
+              <div class="demo-bubble">
+                John is out tomorrow (personal). Mary has offered to cover their
+                Cashier shift (7:00 AM - 3:00 PM). Reply YES to approve or NO to
+                decline.
+              </div>
+            </div>
+
+            <div class="demo-msg is-employee">
+              <div class="demo-meta">👤 Employee · 9:03:41 PM</div>
+              <div class="demo-bubble">yes</div>
+            </div>
+
+            <div class="demo-msg is-system">
+              <div class="demo-meta">🤖 System · 9:03:42 PM</div>
+              <div class="demo-bubble">
+                Done - Mary is confirmed for John's shift tomorrow. We've let
+                them know.
+              </div>
             </div>
           </div>
         </div>
+      </div>
+
+      <div class="demo-nav">
+        <button class="demo-arrow" id="demoPrev" aria-label="Previous example">
+          &larr;
+        </button>
+        <div class="demo-dots-nav" id="demoDotsNav">
+          <button
+            class="carousel-dot is-active"
+            data-index="0"
+            aria-label="Example 1: employee reports the absence"
+          ></button>
+          <button
+            class="carousel-dot"
+            data-index="1"
+            aria-label="Example 2: AI finds a replacement"
+          ></button>
+          <button
+            class="carousel-dot"
+            data-index="2"
+            aria-label="Example 3: manager approves"
+          ></button>
+        </div>
+        <button class="demo-arrow" id="demoNext" aria-label="Next example">
+          &rarr;
+        </button>
       </div>
     </section>
 
@@ -605,31 +1012,29 @@
       <h2>How It Works</h2>
       <div class="features-grid">
         <div class="feature-card">
-          <div class="feature-icon">💬</div>
-          <h3>They Text via SMS</h3>
+          <div class="feature-step">01 &middot; Employee texts</div>
+          <h3>Zero Friction</h3>
           <p>
-            Your employee sends a normal text message to report they can't make
-            a shift. No app for them to install, no portal to log into. Any
-            phone that sends a text works.
+            Employees just text. No app to install, no portal to log into - any
+            phone works.
           </p>
         </div>
 
         <div class="feature-card">
-          <div class="feature-icon">🤖</div>
-          <h3>AI Handels Conversation</h3>
+          <div class="feature-step">02 &middot; AI finds cover</div>
+          <h3>Instant Coverage</h3>
           <p>
-            It asks the reason, then writes the attendance record for you. No
-            spreadsheets to update, no notes to write up afterwards.
+            The AI logs the absence, then texts every qualified coworker. First
+            one to accept gets the shift.
           </p>
         </div>
 
         <div class="feature-card">
-          <div class="feature-icon">📊</div>
-          <h3>You Get Full Visibility</h3>
+          <div class="feature-step">03 &middot; You approve</div>
+          <h3>Full Control</h3>
           <p>
-            Every report lands in your dashboard instantly with the full
-            conversation attached, allowing you to track employee profiles and
-            absences.
+            You approve the swap with one SMS reply. Every conversation lands in
+            your dashboard.
           </p>
         </div>
       </div>
@@ -644,5 +1049,127 @@
     <footer class="footer">
       <p>&copy; <%= new Date().getFullYear() %> AI Attendance.</p>
     </footer>
+
+    <script>
+      (function () {
+        var slides = document.querySelectorAll("#demoBody .demo-slide");
+        var dots = document.querySelectorAll("#demoDotsNav .carousel-dot");
+        var prevBtn = document.getElementById("demoPrev");
+        var nextBtn = document.getElementById("demoNext");
+        var frame = document.querySelector(".demo-frame");
+        if (!slides.length) return;
+
+        var index = 0;
+        var timer = null;
+        var AUTO_MS = 5000;
+        var reduceMotion = window.matchMedia(
+          "(prefers-reduced-motion: reduce)",
+        ).matches;
+
+        function show(i) {
+          index = (i + slides.length) % slides.length;
+          slides.forEach(function (slide, n) {
+            slide.classList.toggle("is-active", n === index);
+          });
+          dots.forEach(function (dot, n) {
+            dot.classList.toggle("is-active", n === index);
+          });
+        }
+
+        function next() {
+          show(index + 1);
+        }
+        function prev() {
+          show(index - 1);
+        }
+
+        function stopAuto() {
+          if (timer) clearInterval(timer);
+        }
+
+        function startAuto() {
+          stopAuto();
+          if (reduceMotion) return; // respect the user's motion preference - no forced auto-advance
+          timer = setInterval(next, AUTO_MS);
+        }
+
+        dots.forEach(function (dot, n) {
+          dot.addEventListener("click", function () {
+            show(n);
+            startAuto();
+          });
+        });
+
+        if (nextBtn)
+          nextBtn.addEventListener("click", function () {
+            next();
+            startAuto();
+          });
+        if (prevBtn)
+          prevBtn.addEventListener("click", function () {
+            prev();
+            startAuto();
+          });
+
+        // Pause auto-advance while a visitor is actually reading a slide.
+        if (frame) {
+          frame.addEventListener("mouseenter", stopAuto);
+          frame.addEventListener("mouseleave", startAuto);
+        }
+
+        // Touch swipe (mobile) - tap-and-drag anywhere on the frame, in
+        // addition to the arrow buttons. A swipe must move further
+        // horizontally than vertically before we treat it as a swipe rather
+        // than the visitor just scrolling the page past the carousel.
+        if (frame) {
+          var touchStartX = 0,
+            touchStartY = 0,
+            touchDeltaX = 0,
+            touchDeltaY = 0,
+            swiping = false;
+          var SWIPE_THRESHOLD = 40;
+
+          frame.addEventListener(
+            "touchstart",
+            function (e) {
+              var t = e.touches[0];
+              touchStartX = t.clientX;
+              touchStartY = t.clientY;
+              touchDeltaX = 0;
+              touchDeltaY = 0;
+              swiping = false;
+              stopAuto();
+            },
+            { passive: true },
+          );
+
+          frame.addEventListener(
+            "touchmove",
+            function (e) {
+              var t = e.touches[0];
+              touchDeltaX = t.clientX - touchStartX;
+              touchDeltaY = t.clientY - touchStartY;
+              if (Math.abs(touchDeltaX) > Math.abs(touchDeltaY)) {
+                swiping = true;
+                e.preventDefault(); // horizontal swipe - don't let the page scroll fight it
+              }
+            },
+            { passive: false },
+          );
+
+          frame.addEventListener("touchend", function () {
+            if (swiping && Math.abs(touchDeltaX) > SWIPE_THRESHOLD) {
+              if (touchDeltaX < 0) next();
+              else prev(); // swipe left -> next, right -> prev
+            }
+            swiping = false;
+            startAuto();
+          });
+        }
+
+        show(0);
+        startAuto();
+      })();
+    </script>
   </body>
 </html>
