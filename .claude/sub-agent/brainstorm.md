@@ -110,7 +110,7 @@ What problems share similar characteristics?
 [Thought-provoking questions for the user]
 ```
 
-## Current System Capabilities (Felton Attendance)
+## Current System Capabilities (godspec.ai)
 
 Based on the codebase:
 

@@ -1,26 +1,42 @@
+<%
+  // Stroke icons rather than emoji: they inherit the link's colour via
+  // currentColor, so they pick up the hover and .active states instead of
+  // staying a fixed multicolour glyph that ignores the theme.
+  const icons = {
+    dashboard: '<rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/>',
+    employees: '<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>',
+    reports:   '<line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/>',
+    settings:  '<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>',
+    logout:    '<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/>'
+  };
+  const icon = (name) =>
+    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" ' +
+    'stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">' +
+    icons[name] + '</svg>';
+%>
 <aside class="sidebar">
   <nav class="sidebar-nav">
     <div class="sidebar-nav-main">
       <a href="/dashboard" class="sidebar-link">
-        <span class="icon">📊</span>
+        <span class="icon"><%- icon('dashboard') %></span>
         <span class="link-text">Dashboard</span>
       </a>
 
       <% if (user && (user.role === 'admin' || user.role === 'super_admin')) {
       %>
       <a href="/admin/employees" class="sidebar-link">
-        <span class="icon">👥</span>
+        <span class="icon"><%- icon('employees') %></span>
         <span class="link-text">Employees</span>
       </a>
       <% } %> <% if (user && (user.role === 'admin' || user.role ===
       'super_admin')) { %>
       <a href="/reports" class="sidebar-link">
-        <span class="icon">📈</span>
+        <span class="icon"><%- icon('reports') %></span>
         <span class="link-text">Reports</span>
       </a>
       <% } %> <% if (user && user.role === 'super_admin') { %>
       <a href="/admin/invite-admin" class="sidebar-link">
-        <span class="icon">⚙️</span>
+        <span class="icon"><%- icon('settings') %></span>
         <span class="link-text">Account Settings</span>
       </a>
       <% } %>
@@ -28,7 +44,7 @@
 
     <div class="sidebar-nav-bottom">
       <a href="/logout" class="logout-btn">
-        <span class="icon">🚪</span>
+        <span class="icon"><%- icon('logout') %></span>
         <span class="btn-text">Logout</span>
       </a>
     </div>

@@ -1,6 +1,6 @@
 @echo off
 echo ================================================
-echo  Felton Brushes AI Attendance System
+echo  godspec.ai
 echo ================================================
 echo.
 

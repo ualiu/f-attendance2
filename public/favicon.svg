@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32">
+  <!-- godspec.ai mark: a lowercase "g" drawn as strokes rather than as text,
+       so it renders identically everywhere instead of depending on a font
+       being installed. Colours match the site background and green accent.
+       Note: XML comments may not contain a double hyphen, so CSS custom
+       property names are not written out here. -->
+  <rect width="32" height="32" rx="7" fill="#000f0d" />
+  <g
+    fill="none"
+    stroke="#4ade80"
+    stroke-width="2.75"
+    stroke-linecap="round"
+  >
+    <circle cx="14.75" cy="14" r="5.25" />
+    <path d="M20 8.75v11.4a4.6 4.6 0 0 1-7.7 3.4" />
+  </g>
+</svg>

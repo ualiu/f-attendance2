@@ -198,7 +198,7 @@ function validateEmail(email) {
 }
 
 // Export for use in other scripts
-window.FeltonAttendance = {
+window.GodspecAI = {
   refreshDashboardData,
   viewMessage,
   viewTranscript,

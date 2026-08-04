@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Felton Attendance ("Hotline BLING" in the UI) is an AI-powered attendance system for Felton Brushes. Employees report absences by SMS; an LLM parses the message into a structured record over a multi-turn conversation. Supervisors manage employees, notes and reports through a web dashboard.
+godspec.ai is an AI-powered attendance system for shift-based teams. Employees report absences by SMS; an LLM parses the message into a structured record over a multi-turn conversation. Supervisors manage employees, notes and reports through a web dashboard.
 
 A second capability, **shift coverage**, builds on that: when a full-day absence is reported, the system finds a same-department teammate to cover it, texts them, and routes manager approval — all before the manager has to make a single call. See *Shift Coverage* below. It ships **disabled by default** (`COVERAGE_ENABLED=false`) pending a real Twilio Account SID.
 

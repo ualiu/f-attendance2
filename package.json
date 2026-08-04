@@ -1,7 +1,7 @@
 {
-  "name": "felton-attendance",
+  "name": "godspec.ai",
   "version": "1.0.0",
-  "description": "AI-powered attendance management system for Felton Brushes",
+  "description": "AI-powered attendance and shift-coverage system",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",

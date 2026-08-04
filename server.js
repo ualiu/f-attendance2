@@ -39,7 +39,7 @@ app.use(express.static(path.join(__dirname, 'public')));
 
 // Session configuration
 app.use(session({
-  secret: process.env.SESSION_SECRET || 'felton-attendance-secret-key-change-this',
+  secret: process.env.SESSION_SECRET || 'godspec-ai-secret-key-change-this',
   resave: false,
   saveUninitialized: false,
   store: MongoStore.create({
@@ -136,7 +136,7 @@ if (process.env.TWILIO_ACCOUNT_SID && !process.env.TWILIO_ACCOUNT_SID.startsWith
 const PORT = process.env.PORT || 3000;
 
 app.listen(PORT, () => {
-  console.log(`\n🚀 Felton Attendance System running on port ${PORT}`);
+  console.log(`\n🚀 godspec.ai running on port ${PORT}`);
   console.log(`📍 Local: http://localhost:${PORT}`);
   console.log(`🔐 Login at: http://localhost:${PORT}/login\n`);
 

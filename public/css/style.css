@@ -263,9 +263,7 @@ a:hover {
 }
 
 .logout-btn .icon {
-  font-size: 1.25rem;
   width: 1.5rem;
-  text-align: center;
   flex-shrink: 0;
 }
 
@@ -295,10 +293,24 @@ a:hover {
 }
 
 .sidebar-link .icon {
-  font-size: 1.25rem;
   width: 24px;
-  text-align: center;
   flex-shrink: 0;
+}
+
+/* Icons are inline SVG using stroke="currentColor", so they follow the link's
+   colour through :hover and .active rather than needing their own rules. */
+.sidebar-link .icon,
+.logout-btn .icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.sidebar-link .icon svg,
+.logout-btn .icon svg {
+  width: 20px;
+  height: 20px;
+  display: block;
 }
 
 

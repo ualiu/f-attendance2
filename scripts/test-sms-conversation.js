@@ -36,7 +36,7 @@ const MOCK_EMPLOYEE = {
   organization_id: 'mock-org-id'
 };
 
-const ORG_NAME = 'Felton Brushes';
+const ORG_NAME = 'Test Org';
 const TIMEZONE = 'America/New_York';
 
 function freshState() {
