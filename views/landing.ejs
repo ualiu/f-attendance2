@@ -104,6 +104,19 @@
         flex-shrink: 0;
       }
 
+      /* Eyebrow - carries the product category so the h1 is free to sell the
+         benefit. Letter-spacing is positive here, unlike the tight h1.
+         Must be scoped to .hero: a bare .eyebrow (0,1,0) loses to .hero p
+         (0,1,1) and would inherit the paragraph size and margin. */
+      .hero .eyebrow {
+        font-size: 0.8125rem;
+        font-weight: 500;
+        text-transform: uppercase;
+        letter-spacing: 0.14em;
+        color: var(--text-secondary);
+        margin-bottom: 1.25rem;
+      }
+
       .hero h1 {
         font-size: clamp(2rem, 5vw, 3.5rem);
         margin-bottom: 1.5rem;
@@ -421,6 +434,12 @@
           padding: 2.5rem 4% 2rem;
         }
 
+        .hero .eyebrow {
+          font-size: 0.75rem;
+          letter-spacing: 0.12em;
+          margin-bottom: 1rem;
+        }
+
         .hero h1 {
           font-size: 1.625rem;
         }
@@ -500,10 +519,11 @@
     </nav>
 
     <section class="hero">
-      <h1>AI for Employee Attendance</h1>
+      <p class="eyebrow">Employee Attendance Management</p>
+      <h1>Automate employee call-ins with AI</h1>
       <p>
-        When your employees can't come to work, have them text your AI instead
-        of you. The AI takes care of the reporting.
+        When employees can't make it to work, they text the AI assistant instead
+        of the manager. AI handles the conversation &amp; reporting.
       </p>
       <a href="/login" class="cta-button">Get Started</a>
     </section>
