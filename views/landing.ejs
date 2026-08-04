@@ -142,12 +142,8 @@
          The track holds two identical copies of the list and translates by
          exactly -50%, so copy two lands where copy one started and the loop
          is seamless with no visible jump. */
-      /* No padding-top: the hero's own padding-bottom sits above the line.
-         padding-bottom is set to (hero bottom - .demo top) so the ticker has
-         equal air above and below at every breakpoint - keep the three in
-         sync if any of those change. */
       .industries {
-        padding: 0 0 3rem;
+        padding: 0 0 2.5rem;
         overflow: hidden;
         flex-shrink: 0;
         /* Fade both edges into the background rather than hard-cutting a
@@ -224,7 +220,7 @@
         .industries {
           -webkit-mask-image: none;
           mask-image: none;
-          padding: 0 5% 3rem;
+          padding: 0 5% 2.5rem;
         }
 
         .industries-track {
@@ -477,10 +473,8 @@
       }
 
       /* Features */
-      /* 5rem top and bottom, matching .cta-section - each section sits
-         centred between its own rules. */
       .features {
-        padding: 5rem 5%;
+        padding: 4rem 5% 5rem;
         border-top: 1px solid var(--border);
         flex: 1;
       }
@@ -627,11 +621,6 @@
           padding: 3.5rem 4% 3rem;
         }
 
-        /* hero bottom (3) - demo top (1) = 2rem, keeping the ticker centred */
-        .industries {
-          padding: 0 0 2rem;
-        }
-
         .demo {
           padding: 1rem 4% 3.5rem;
         }
@@ -678,11 +667,6 @@
 
         .hero {
           padding: 3rem 5% 2.5rem;
-        }
-
-        /* hero bottom (2.5) - demo top (1) = 1.5rem */
-        .industries {
-          padding: 0 0 1.5rem;
         }
 
         .demo {
@@ -736,11 +720,6 @@
 
         .hero {
           padding: 2.5rem 4% 2rem;
-        }
-
-        /* hero bottom (2) - demo top (1) = 1rem */
-        .industries {
-          padding: 0 0 1rem;
         }
 
         .hero .eyebrow {
@@ -809,11 +788,6 @@
           padding: 2rem 5%;
         }
 
-        /* hero bottom (2) - demo top (1) = 1rem */
-        .industries {
-          padding: 0 0 1rem;
-        }
-
         .hero h1 {
           margin-bottom: 1rem;
         }
@@ -834,7 +808,7 @@
 
     <section class="hero">
       <p class="eyebrow">Employee Attendance Management</p>
-      <h1>Automate employee call-ins with AI</h1>
+      <h1>Automate employee shift swapping with AI</h1>
       <p>
         AI assistant that handles employee call-ins &amp; fills shift gaps via
         SMS. Manager always approves.
