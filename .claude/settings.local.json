@@ -22,7 +22,13 @@
       "Bash(git -C \"C:/Users/Urim Aliu/Desktop/fun-projects/felton-attendance\" log --oneline -15)",
       "WebFetch(domain:www.reddit.com)",
       "Bash(timeout 10 npm start:*)",
-      "Bash(powershell -c \"if \\(Select-String -Path .env -Pattern '^OPENAI_API_KEY=.+'\\) { 'OPENAI_API_KEY is set' } else { 'OPENAI_API_KEY is EMPTY' }\")"
+      "Bash(powershell -c \"if \\(Select-String -Path .env -Pattern '^OPENAI_API_KEY=.+'\\) { 'OPENAI_API_KEY is set' } else { 'OPENAI_API_KEY is EMPTY' }\")",
+      "Bash(powershell -c \"Get-Process node -ErrorAction SilentlyContinue | Select-Object Id, ProcessName, StartTime\")",
+      "Bash(powershell -c \"Get-NetTCPConnection -LocalPort 3000 -State Listen -ErrorAction SilentlyContinue | Select-Object LocalAddress, LocalPort, OwningProcess\")",
+      "Bash(git fetch *)",
+      "Bash(git rev-list *)",
+      "Bash(command -v railway)",
+      "Bash(curl *)"
     ],
     "deny": [],
     "ask": []

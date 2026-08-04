@@ -73,6 +73,15 @@ router.post('/incoming', async (req, res) => {
       console.log('   💬 Conversation state:', JSON.stringify(conversationState.collected_info, null, 2));
     }
 
+    // If we already logged an absence in this window, this message may be the
+    // employee correcting it (we invited them to). Remember which record so we
+    // can undo it if so.
+    const priorLoggedAbsenceId =
+      conversationState?.status === 'logged' ? conversationState.last_absence_id : null;
+    if (priorLoggedAbsenceId) {
+      console.log('   📌 Within correction window for absence', String(priorLoggedAbsenceId));
+    }
+
     // Initialize transcript array if this is a new conversation
     if (!conversationState || !conversationState.transcript) {
       if (!conversationState) {
@@ -103,60 +112,45 @@ router.post('/incoming', async (req, res) => {
 
     console.log('   📋 Parsed data:', parsedData);
 
+    // Post-log handling. Either the employee is correcting the record we just
+    // created, or they have moved on to an unrelated new report.
+    if (priorLoggedAbsenceId) {
+      if (parsedData.is_correction) {
+        await smsService.undoLoggedAbsence(priorLoggedAbsenceId, employee._id);
+        conversationState = await smsService.reopenConversationForCorrection(phoneNumber);
+      } else {
+        console.log('   🆕 Not a correction - starting a fresh conversation');
+        await smsService.clearConversation(phoneNumber);
+        conversationState = await smsService.updateConversationState(
+          phoneNumber, messageBody, null, null,
+          [{ from: 'employee', message: messageBody, timestamp: new Date() }]
+        );
+      }
+    }
+
     if (!parsedData.success) {
       console.log('   ❌ Failed to parse message:', parsedData.error);
       console.log('   📋 Full parsed data:', JSON.stringify(parsedData, null, 2));
 
       const twiml = new twilio.twiml.MessagingResponse();
-      let followUpMessage = '';
-      let questionAsked = '';
 
-      // Only greet on first message, not on follow-ups
-      const greeting = isFollowUp ? '' : `Hi ${employee.name}, `;
+      // Wording lives in smsService so the test harness exercises it too
+      const { questionAsked, message: baseQuestion } =
+        smsService.buildFollowUpQuestion(parsedData, employee, isFollowUp);
+      let followUpMessage = baseQuestion;
+      console.log(`   💬 Asking for ${questionAsked}...`);
 
-      // Determine what to ask based on what's missing
-      if (parsedData.ask_what === 'status') {
-        // Completely unclear - ask what's happening
-        console.log('   💬 Asking for status (sick/late/out)...');
-        questionAsked = 'status';
-        followUpMessage = `${greeting}are you running late, calling out sick, or taking time off today?`;
-      }
-      else if (parsedData.ask_what === 'duration') {
-        // We know the type but not duration
-        console.log('   💬 Asking for duration...');
-        questionAsked = 'duration';
+      // Loop breaker: if we're about to ask the same thing again, acknowledge it,
+      // and after several turns hand off to a human instead of looping forever.
+      const repeatingQuestion = conversationState.last_question_asked === questionAsked;
+      const turnCount = conversationState.messages?.length || 0;
 
-        if (parsedData.type === 'late' || parsedData.type === 'unclear_duration') {
-          followUpMessage = `${greeting}how late will you be? (e.g., "30 min", "2 hours")`;
-        } else {
-          followUpMessage = `${greeting}how long will you be out? (e.g., "few hours", "half day", "all day")`;
-        }
-      }
-      else if (parsedData.ask_what === 'reason') {
-        // We know duration/type but not reason
-        console.log('   💬 Asking for reason...');
-        questionAsked = 'reason';
-
-        if (parsedData.type === 'late') {
-          followUpMessage = `${greeting}why are you running late? (e.g., traffic, car trouble, appointment)`;
-        } else if (parsedData.type === 'half_day' || parsedData.type === 'full_day') {
-          if (parsedData.subtype === 'sick') {
-            followUpMessage = `${greeting}what's going on? (e.g., flu, headache, doctor visit)`;
-          } else {
-            followUpMessage = `${greeting}what's the reason? (e.g., appointment, errands, family matter)`;
-          }
-        } else {
-          followUpMessage = `${greeting}what's the reason?`;
-        }
-      }
-      else {
-        // Fallback - generic help
-        console.log('   💬 Sending generic help message...');
-        console.log('   ⚠️  DEBUGGING - parsedData.ask_what:', parsedData.ask_what);
-        console.log('   ⚠️  DEBUGGING - parsedData.error:', parsedData.error);
-        console.log('   ⚠️  DEBUGGING - Full parsedData:', JSON.stringify(parsedData, null, 2));
-        questionAsked = 'help';
-        followUpMessage = `${greeting}please text something like: "Running 30 min late - traffic" or "Sick with flu" or "Out for appointment"`;
+      if (repeatingQuestion && turnCount >= 4) {
+        console.log('   🛑 Loop detected - handing off to phone');
+        followUpMessage = `Sorry, I'm having trouble understanding. Please call (905) 522-3811 ext #8 and we'll log it for you.`;
+      } else if (repeatingQuestion) {
+        console.log('   ⚠️  Re-asking the same question');
+        followUpMessage = `Sorry, I didn't catch that. ${followUpMessage}`;
       }
 
       // Add system response to transcript
@@ -199,9 +193,15 @@ router.post('/incoming', async (req, res) => {
 
     console.log('   ✅ Absence logged:', absence._id);
 
-    // Clear conversation state since we successfully logged the absence
-    await smsService.clearConversation(phoneNumber);
-    console.log('   🧹 Conversation cleared');
+    // Keep the conversation alive instead of clearing it, so the employee can
+    // reply to correct the record (the confirmation invites them to). It still
+    // expires on the normal 15-minute TTL.
+    const loggedSummary =
+      `${parsedData.type} (${parsedData.subtype || 'n/a'}), ` +
+      `${parsedData.duration_minutes || 0} min, ` +
+      `${parsedData.date || 'today'}, reason: ${parsedData.reason || 'none'}`;
+    await smsService.markConversationLogged(phoneNumber, absence, loggedSummary);
+    console.log('   📌 Correction window open:', loggedSummary);
 
     console.log('   📤 Sending response:', responseMessage);
 
